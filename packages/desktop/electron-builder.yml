@@ -1,0 +1,27 @@
+appId: com.octonote.app
+productName: OctoNote
+directories:
+  buildResources: assets
+  output: release
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: ../web/dist
+    to: web-dist
+    filter:
+      - "**/*"
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+    - portable
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Office
