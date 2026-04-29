@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import mermaid from 'mermaid';
 import { useNoteStore } from '@/store/noteStore';
 import { api } from '@/api/client';
 import {
@@ -12,7 +13,16 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Sparkles, Send, Loader2, StopCircle } from 'lucide-react';
+import {
+  Sparkles,
+  Send,
+  Loader2,
+  StopCircle,
+  FileText,
+  GitBranch,
+  Maximize2,
+  Tag,
+} from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -22,6 +32,83 @@ interface AiPanelProps {
   noteId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Parse [[Note Title]] wikilinks in text and render as clickable spans */
+function renderWithWikilinks(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const regex = /\[\[([^\]]+)\]\]/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const title = match[1];
+    parts.push(
+      <span
+        key={`wl-${match.index}`}
+        className="text-purple-400 hover:text-purple-300 cursor-pointer underline underline-offset-2"
+        title={`Open note: ${title}`}
+      >
+        [[{title}]]
+      </span>,
+    );
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+/** Extract unique [[Note Title]] references from text */
+function extractSources(text: string): string[] {
+  const regex = /\[\[([^\]]+)\]\]/g;
+  const sources = new Set<string>();
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    sources.add(match[1]);
+  }
+  return Array.from(sources);
+}
+
+// ---------------------------------------------------------------------------
+// Inline Mermaid Preview
+// ---------------------------------------------------------------------------
+
+let mermaidCounter = 0;
+
+function MermaidPreview({ source }: { source: string }) {
+  const [svg, setSvg] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const id = `ai-mermaid-${++mermaidCounter}`;
+        const { svg: rendered } = await mermaid.render(id, source);
+        setSvg(rendered);
+      } catch {
+        setSvg('');
+      }
+    })();
+  }, [source]);
+
+  if (!svg) return null;
+
+  return (
+    <div
+      className="my-2 rounded border border-border p-2 bg-background [&>svg]:max-w-full [&>svg]:h-auto"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +137,6 @@ export function AiPanel({ noteId, open, onOpenChange }: AiPanelProps) {
       await api.ai.stream(
         trimmed,
         (chunk: unknown) => {
-          // Accumulate streaming text chunks
           if (typeof chunk === 'string') {
             setResponse((prev) => prev + chunk);
           } else if (
@@ -81,7 +167,6 @@ export function AiPanel({ noteId, open, onOpenChange }: AiPanelProps) {
     } finally {
       setStreaming(false);
       abortControllerRef.current = null;
-      // Refresh the note to pick up any AI-generated changes
       fetchNote(noteId);
     }
   }, [prompt, streaming, noteId, fetchNote]);
@@ -97,6 +182,27 @@ export function AiPanel({ noteId, open, onOpenChange }: AiPanelProps) {
     }
   };
 
+  const handleQuickAction = useCallback(
+    (template: string) => {
+      setPrompt(template);
+    },
+    [],
+  );
+
+  // Extract sources from response
+  const sources = useMemo(() => extractSources(response), [response]);
+
+  // Detect mermaid code blocks in response
+  const mermaidBlocks = useMemo(() => {
+    const regex = /```mermaid\n([\s\S]*?)```/g;
+    const blocks: string[] = [];
+    let match;
+    while ((match = regex.exec(response)) !== null) {
+      blocks.push(match[1].trim());
+    }
+    return blocks;
+  }, [response]);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-[400px] flex-col sm:max-w-[400px]">
@@ -106,11 +212,51 @@ export function AiPanel({ noteId, open, onOpenChange }: AiPanelProps) {
             AI Assistant
           </SheetTitle>
           <SheetDescription>
-            Ask AI to help create, edit, or summarize your note.
+            Ask AI to help create, edit, summarize, or diagram your notes.
           </SheetDescription>
         </SheetHeader>
 
         <Separator />
+
+        {/* Quick action buttons */}
+        <div className="flex flex-wrap gap-1.5 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs h-7"
+            onClick={() => handleQuickAction(`Summarize the current note (noteId: ${noteId})`)}
+          >
+            <FileText className="h-3 w-3" />
+            Summarize
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs h-7"
+            onClick={() => handleQuickAction(`Generate a diagram for the current note (noteId: ${noteId})`)}
+          >
+            <GitBranch className="h-3 w-3" />
+            Diagram
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs h-7"
+            onClick={() => handleQuickAction(`Expand the current note with more detail (noteId: ${noteId})`)}
+          >
+            <Maximize2 className="h-3 w-3" />
+            Expand
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs h-7"
+            onClick={() => handleQuickAction(`Analyze and auto-tag the current note (noteId: ${noteId})`)}
+          >
+            <Tag className="h-3 w-3" />
+            Auto-tag
+          </Button>
+        </div>
 
         {/* Prompt input */}
         <div className="space-y-3 pt-2">
@@ -159,8 +305,34 @@ export function AiPanel({ noteId, open, onOpenChange }: AiPanelProps) {
         {/* Response display */}
         <ScrollArea className="flex-1 pt-2">
           {response ? (
-            <div className="whitespace-pre-wrap text-sm leading-relaxed">
-              {response}
+            <div className="space-y-3">
+              <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                {renderWithWikilinks(response)}
+              </div>
+
+              {/* Inline Mermaid previews */}
+              {mermaidBlocks.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Diagram Preview</p>
+                  {mermaidBlocks.map((src, i) => (
+                    <MermaidPreview key={i} source={src} />
+                  ))}
+                </div>
+              )}
+
+              {/* Sources section */}
+              {sources.length > 0 && (
+                <div className="border-t border-border pt-2">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Sources</p>
+                  <ul className="space-y-0.5">
+                    {sources.map((title) => (
+                      <li key={title} className="text-xs text-purple-400">
+                        [[{title}]]
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

@@ -11,6 +11,7 @@ export enum BlockType {
   Image = 'image',
   Embed = 'embed',
   Table = 'table',
+  Diagram = 'diagram',
 }
 
 export interface Block {

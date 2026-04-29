@@ -11,6 +11,11 @@ import {
   handleGetNote,
   handleListTags,
   handleListFolders,
+  handleGenerateDiagram,
+  handleUpdateDiagram,
+  handleGetNotesContent,
+  handleSummarizeNotes,
+  handleAutoTag,
 } from './handlers';
 
 /**
@@ -42,6 +47,16 @@ export function executeTool(
       return handleListTags(container);
     case 'list_folders':
       return handleListFolders(container);
+    case 'generate_diagram':
+      return handleGenerateDiagram(container, input as any);
+    case 'update_diagram':
+      return handleUpdateDiagram(container, input as any);
+    case 'get_notes_content':
+      return handleGetNotesContent(container, input as any);
+    case 'summarize_notes':
+      return handleSummarizeNotes(container, input as any);
+    case 'auto_tag':
+      return handleAutoTag(container, input as any);
     default:
       return { success: false, error: `Unknown tool: ${toolName}` };
   }

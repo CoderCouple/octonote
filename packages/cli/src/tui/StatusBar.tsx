@@ -14,6 +14,7 @@ const MODE_HINTS: Record<EditorMode, string> = {
   slash: 'Select block type  Esc:cancel',
   wikilink: 'Search notes  Esc:cancel',
   tag: 'Enter:add  d:remove  Esc:done',
+  'ai-prompt': 'Enter:submit  Esc:cancel',
 };
 
 const MODE_COLORS: Record<EditorMode, string> = {
@@ -22,6 +23,7 @@ const MODE_COLORS: Record<EditorMode, string> = {
   slash: 'yellow',
   wikilink: 'magenta',
   tag: 'cyan',
+  'ai-prompt': 'magenta',
 };
 
 export function StatusBar({ mode, title, dirty }: StatusBarProps): React.ReactElement {

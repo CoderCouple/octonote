@@ -13,6 +13,7 @@ export enum BlockType {
   Image = 'image',
   Embed = 'embed',
   Table = 'table',
+  Diagram = 'diagram',
 }
 
 export interface Block {
@@ -93,4 +94,5 @@ export interface GraphEdge {
 export interface AiResult {
   response: string;
   affectedNotes: string[];
+  sources: string[];
 }

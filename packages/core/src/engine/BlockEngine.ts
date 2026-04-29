@@ -77,6 +77,12 @@ export class BlockEngine {
         return [makeBlock(BlockType.Paragraph, token.text)];
 
       case 'code':
+        if (token.lang === 'mermaid') {
+          return [makeBlock(BlockType.Diagram, token.text, {
+            diagramType: this.inferDiagramType(token.text),
+            syntax: 'mermaid',
+          })];
+        }
         return [makeBlock(BlockType.Code, token.text, { lang: token.lang || '' })];
 
       case 'blockquote': {
@@ -181,6 +187,8 @@ export class BlockEngine {
         const body = rows.slice(1).map(r => '| ' + r.join(' | ') + ' |').join('\n');
         return [header, sep, body].filter(Boolean).join('\n');
       }
+      case BlockType.Diagram:
+        return '```mermaid\n' + block.content + '\n```';
       default:
         return block.content;
     }
@@ -236,8 +244,32 @@ export class BlockEngine {
         const body = rows.slice(1).map(r => r.map((c, i) => pad(c, colWidths[i])).join(' │ ')).join('\n');
         return [header, sep, body].filter(Boolean).join('\n');
       }
+      case BlockType.Diagram: {
+        const diagramType = (block.meta.diagramType as string) || 'diagram';
+        const label = chalk.magenta.bold(`[${diagramType}]`);
+        const border = chalk.magenta.dim('│ ');
+        const lines = block.content.split('\n').map(l => border + chalk.magenta(l)).join('\n');
+        return label + '\n' + lines;
+      }
       default:
         return block.content;
     }
+  }
+
+  // ── Diagram helpers ─────────────────────────────────
+
+  private inferDiagramType(content: string): string {
+    const firstLine = content.trim().split('\n')[0].trim().toLowerCase();
+    if (firstLine.startsWith('graph') || firstLine.startsWith('flowchart')) return 'flowchart';
+    if (firstLine.startsWith('sequencediagram')) return 'sequence';
+    if (firstLine.startsWith('erdiagram')) return 'er';
+    if (firstLine.startsWith('gantt')) return 'gantt';
+    if (firstLine.startsWith('classdiagram')) return 'class';
+    if (firstLine.startsWith('statediagram')) return 'state';
+    if (firstLine.startsWith('pie')) return 'pie';
+    if (firstLine.startsWith('mindmap')) return 'mindmap';
+    if (firstLine.startsWith('timeline')) return 'timeline';
+    if (firstLine.startsWith('gitgraph')) return 'gitgraph';
+    return 'diagram';
   }
 }

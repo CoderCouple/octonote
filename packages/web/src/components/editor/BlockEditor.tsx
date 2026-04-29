@@ -13,7 +13,9 @@ import { DividerBlock } from '@/components/blocks/DividerBlock';
 import { ImageBlock } from '@/components/blocks/ImageBlock';
 import { EmbedBlock } from '@/components/blocks/EmbedBlock';
 import { TableBlock } from '@/components/blocks/TableBlock';
+import { DiagramBlock } from '@/components/blocks/DiagramBlock';
 import { SlashMenu } from './SlashMenu';
+import { AiPromptDialog } from './AiPromptDialog';
 import { BlockType } from '@/types';
 import type { Block } from '@/types';
 
@@ -42,6 +44,7 @@ const BLOCK_COMPONENTS: Record<
   [BlockType.Image]: ImageBlock,
   [BlockType.Embed]: EmbedBlock,
   [BlockType.Table]: TableBlock,
+  [BlockType.Diagram]: DiagramBlock,
 };
 
 // ---------------------------------------------------------------------------
@@ -64,6 +67,10 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
     position: { top: number; left: number };
     afterBlockId: string | null;
   }>({ open: false, position: { top: 0, left: 0 }, afterBlockId: null });
+  const [aiDialog, setAiDialog] = useState<{ open: boolean; command: string | null }>({
+    open: false,
+    command: null,
+  });
 
   const updateBlock = useNoteStore((s) => s.updateBlock);
   const deleteBlock = useNoteStore((s) => s.deleteBlock);
@@ -188,6 +195,11 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
     setSlashMenu((prev) => ({ ...prev, open: false }));
   }, []);
 
+  const handleAiCommand = useCallback((command: string) => {
+    setSlashMenu((prev) => ({ ...prev, open: false }));
+    setAiDialog({ open: true, command });
+  }, []);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -240,9 +252,17 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
         <SlashMenu
           onSelect={handleSlashSelect}
           onClose={handleSlashClose}
+          onAiCommand={handleAiCommand}
           position={slashMenu.position}
         />
       )}
+
+      <AiPromptDialog
+        noteId={noteId}
+        command={aiDialog.command}
+        open={aiDialog.open}
+        onOpenChange={(open) => setAiDialog((prev) => ({ ...prev, open }))}
+      />
     </div>
   );
 }

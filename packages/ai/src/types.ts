@@ -25,6 +25,7 @@ export interface AiResult {
   response: string;
   toolCalls: ToolCallRecord[];
   affectedNotes: string[];
+  sources: string[];
 }
 
 export interface AiServiceConfig {

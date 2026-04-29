@@ -44,6 +44,7 @@ function blockPrefix(block: Block): string {
     case 'quote': return '│ ';
     case 'callout': return `[${(block.meta.calloutType as string) || '!'}] `;
     case 'divider': return '───';
+    case 'diagram': return '◇ ';
     default: return '';
   }
 }
@@ -60,6 +61,7 @@ function blockStyle(block: Block): { bold?: boolean; color?: string; dimColor?: 
     case 'quote': return { color: 'gray' };
     case 'callout': return { color: 'blue' };
     case 'divider': return { dimColor: true };
+    case 'diagram': return { color: 'magenta' };
     default: return {};
   }
 }

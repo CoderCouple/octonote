@@ -288,3 +288,194 @@ export function handleListFolders(container: Container): ToolResult {
     return { success: false, error: err.message };
   }
 }
+
+// ── Diagram Handlers ────────────────────────────────────
+
+export function handleGenerateDiagram(
+  container: Container,
+  input: { mermaidSyntax: string; diagramType: string; noteId?: string; noteTitle?: string }
+): ToolResult {
+  try {
+    let noteId: string;
+
+    if (input.noteId) {
+      const note = resolveNote(container, input.noteId);
+      if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
+      noteId = note.id;
+    } else {
+      const title = input.noteTitle || `Diagram: ${input.diagramType}`;
+      const note = container.noteRepository.createNote(title);
+      noteId = note.id;
+    }
+
+    const existing = container.noteRepository.getBlocksByNote(noteId);
+    const position = existing.length;
+
+    const block = container.noteRepository.createBlock({
+      noteId,
+      type: 'diagram' as Block['type'],
+      content: input.mermaidSyntax,
+      meta: { diagramType: input.diagramType, syntax: 'mermaid' },
+      position,
+      parentId: null,
+    });
+
+    fullSave(container, noteId);
+
+    return {
+      success: true,
+      data: { noteId, blockId: block.id, diagramType: input.diagramType },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function handleUpdateDiagram(
+  container: Container,
+  input: { noteId: string; blockId: string; mermaidSyntax: string }
+): ToolResult {
+  try {
+    const note = resolveNote(container, input.noteId);
+    if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
+
+    const blocks = container.noteRepository.getBlocksByNote(note.id);
+    const block = blocks.find(b => b.id === input.blockId);
+    if (!block) return { success: false, error: `Block not found: ${input.blockId}` };
+    if (block.type !== ('diagram' as Block['type'])) {
+      return { success: false, error: `Block ${input.blockId} is not a diagram block` };
+    }
+
+    container.noteRepository.updateBlock(input.blockId, {
+      content: input.mermaidSyntax,
+    });
+
+    fullSave(container, note.id);
+
+    return {
+      success: true,
+      data: { noteId: note.id, blockId: input.blockId },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// ── Synthesis Handlers (NotebookLM-style) ───────────────
+
+export function handleGetNotesContent(
+  container: Container,
+  input: { noteIds: string[] }
+): ToolResult {
+  try {
+    const notes: unknown[] = [];
+
+    for (const noteRef of input.noteIds) {
+      const note = resolveNote(container, noteRef);
+      if (!note) {
+        notes.push({ id: noteRef, error: `Note not found: ${noteRef}` });
+        continue;
+      }
+
+      const tags = container.noteRepository.getNoteTags(note.id);
+      notes.push({
+        id: note.id,
+        title: note.title,
+        folderId: note.folderId,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+        tags: tags.map(t => t.name),
+        blocks: (note.blocks || []).map(b => ({
+          id: b.id,
+          type: b.type,
+          content: b.content,
+          meta: b.meta,
+          position: b.position,
+        })),
+      });
+    }
+
+    return { success: true, data: notes };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function handleSummarizeNotes(
+  container: Container,
+  input: {
+    noteIds: string[];
+    summaryTitle: string;
+    blocks: BlockInput[];
+    tags?: string[];
+  }
+): ToolResult {
+  try {
+    // Create the summary note
+    const summaryNote = container.noteRepository.createNote(input.summaryTitle);
+
+    // Create blocks
+    for (let i = 0; i < input.blocks.length; i++) {
+      const b = input.blocks[i];
+      container.noteRepository.createBlock({
+        noteId: summaryNote.id,
+        type: b.type as Block['type'],
+        content: b.content,
+        meta: b.meta || {},
+        position: i,
+        parentId: null,
+      });
+    }
+
+    // Add ai-summary tag + custom tags
+    container.noteRepository.addTagToNote(summaryNote.id, 'ai-summary');
+    if (input.tags) {
+      for (const tag of input.tags) {
+        container.noteRepository.addTagToNote(summaryNote.id, tag);
+      }
+    }
+
+    // Resolve source notes for metadata
+    const sourceNotes: string[] = [];
+    for (const noteRef of input.noteIds) {
+      const note = resolveNote(container, noteRef);
+      if (note) sourceNotes.push(note.title);
+    }
+
+    fullSave(container, summaryNote.id);
+
+    return {
+      success: true,
+      data: {
+        noteId: summaryNote.id,
+        title: summaryNote.title,
+        sourceNotes,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function handleAutoTag(
+  container: Container,
+  input: { noteId: string; tags: string[] }
+): ToolResult {
+  try {
+    const note = resolveNote(container, input.noteId);
+    if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
+
+    for (const tag of input.tags) {
+      container.noteRepository.addTagToNote(note.id, tag);
+    }
+
+    fullSave(container, note.id);
+
+    return {
+      success: true,
+      data: { noteId: note.id, tagsAdded: input.tags },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}

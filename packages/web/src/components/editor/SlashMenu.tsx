@@ -21,6 +21,12 @@ import {
   Minus,
   Image as ImageIcon,
   Table2,
+  GitBranch,
+  Sparkles,
+  FileText,
+  Maximize2,
+  Tag,
+  Wand2,
 } from 'lucide-react';
 import { BlockType } from '@/types';
 
@@ -49,15 +55,31 @@ const MENU_ITEMS: SlashMenuItem[] = [
   { type: BlockType.Divider, label: 'Divider', icon: Minus },
   { type: BlockType.Image, label: 'Image', icon: ImageIcon },
   { type: BlockType.Table, label: 'Table', icon: Table2 },
+  { type: BlockType.Diagram, label: 'Diagram', icon: GitBranch },
 ];
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
+interface AiMenuItem {
+  command: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const AI_MENU_ITEMS: AiMenuItem[] = [
+  { command: 'ai-diagram', label: 'AI: Generate Diagram', icon: Sparkles },
+  { command: 'ai-summarize', label: 'AI: Summarize', icon: FileText },
+  { command: 'ai-expand', label: 'AI: Expand', icon: Maximize2 },
+  { command: 'ai-auto-tag', label: 'AI: Auto-tag', icon: Tag },
+  { command: 'ai-generate', label: 'AI: Generate Content', icon: Wand2 },
+];
+
 interface SlashMenuProps {
   onSelect: (type: BlockType) => void;
   onClose: () => void;
+  onAiCommand?: (command: string) => void;
   position?: { top: number; left: number };
 }
 
@@ -65,7 +87,7 @@ interface SlashMenuProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function SlashMenu({ onSelect, onClose, position }: SlashMenuProps) {
+export function SlashMenu({ onSelect, onClose, onAiCommand, position }: SlashMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
@@ -132,6 +154,27 @@ export function SlashMenu({ onSelect, onClose, position }: SlashMenuProps) {
               );
             })}
           </CommandGroup>
+          {onAiCommand && (
+            <CommandGroup heading="AI Commands">
+              {AI_MENU_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <CommandItem
+                    key={item.command}
+                    value={item.label}
+                    onSelect={() => {
+                      onAiCommand(item.command);
+                      onClose();
+                    }}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Icon className="h-4 w-4 text-purple-400" />
+                    <span>{item.label}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          )}
         </CommandList>
       </Command>
     </div>

@@ -1,5 +1,6 @@
-import React, { useReducer, useCallback } from 'react';
-import { Box, useInput, useApp } from 'ink';
+import React, { useReducer, useCallback, useState } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
+import TextInput from 'ink-text-input';
 import type { Container, Block, Note, BlockType } from '@octonote/core';
 import { StatusBar } from './StatusBar.js';
 import { BlockList } from './BlockList.js';
@@ -10,7 +11,7 @@ import { saveNote as saveNoteUtil } from '../utils/saveNote.js';
 
 // ── State & Actions ──────────────────────────
 
-export type EditorMode = 'normal' | 'insert' | 'slash' | 'wikilink' | 'tag';
+export type EditorMode = 'normal' | 'insert' | 'slash' | 'wikilink' | 'tag' | 'ai-prompt';
 
 export interface EditorState {
   mode: EditorMode;
@@ -211,6 +212,10 @@ export function Editor({ container, note }: EditorProps): React.ReactElement {
       if (key.escape) {
         dispatch({ type: 'SET_MODE', mode: 'normal' });
       }
+    } else if (state.mode === 'ai-prompt') {
+      if (key.escape) {
+        dispatch({ type: 'SET_MODE', mode: 'normal' });
+      }
     }
   });
 
@@ -220,6 +225,15 @@ export function Editor({ container, note }: EditorProps): React.ReactElement {
     if (content.endsWith('[[')) {
       dispatch({ type: 'SET_MODE', mode: 'wikilink' });
     }
+  }, []);
+
+  const [aiPromptText, setAiPromptText] = useState('');
+  const [aiCommand, setAiCommand] = useState('');
+
+  const handleAiCommand = useCallback((command: string) => {
+    setAiCommand(command);
+    setAiPromptText('');
+    dispatch({ type: 'SET_MODE', mode: 'ai-prompt' });
   }, []);
 
   const handleSlashSelect = useCallback((blockType: BlockType) => {
@@ -266,9 +280,25 @@ export function Editor({ container, note }: EditorProps): React.ReactElement {
         onExit={() => dispatch({ type: 'SET_MODE', mode: 'normal' })}
       />
       <Box flexDirection="column" flexGrow={1}>
-        {state.mode === 'slash' ? (
+        {state.mode === 'ai-prompt' ? (
+          <Box flexDirection="column">
+            <Text bold color="magenta">AI ({aiCommand}):</Text>
+            <Box>
+              <Text color="gray">Prompt: </Text>
+              <TextInput
+                value={aiPromptText}
+                onChange={setAiPromptText}
+                onSubmit={() => {
+                  // AI execution would happen here with AiService
+                  dispatch({ type: 'SET_MODE', mode: 'normal' });
+                }}
+              />
+            </Box>
+          </Box>
+        ) : state.mode === 'slash' ? (
           <SlashMenu
             onSelect={handleSlashSelect}
+            onAiCommand={handleAiCommand}
             onCancel={() => dispatch({ type: 'SET_MODE', mode: 'normal' })}
           />
         ) : state.mode === 'wikilink' ? (

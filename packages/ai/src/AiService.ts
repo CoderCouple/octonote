@@ -31,6 +31,7 @@ export class AiService {
     const systemPrompt = buildSystemPrompt(this.container);
     const toolCalls: ToolCallRecord[] = [];
     const affectedNotes = new Set<string>();
+    const sources = new Set<string>();
 
     // Add user message
     this.messages.push({ role: 'user', content: prompt });
@@ -105,6 +106,17 @@ export class AiService {
           }
         }
 
+        // Track source notes for read operations
+        if (toolUse.name === 'get_note' && result.success && result.data) {
+          const data = result.data as Record<string, unknown>;
+          if (data.title) sources.add(data.title as string);
+        }
+        if (toolUse.name === 'get_notes_content' && result.success && Array.isArray(result.data)) {
+          for (const note of result.data as Array<Record<string, unknown>>) {
+            if (note.title) sources.add(note.title as string);
+          }
+        }
+
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolUse.id,
@@ -120,6 +132,7 @@ export class AiService {
       response: finalResponse,
       toolCalls,
       affectedNotes: Array.from(affectedNotes),
+      sources: Array.from(sources),
     };
   }
 

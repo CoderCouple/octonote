@@ -20,7 +20,7 @@ export const TOOL_DEFINITIONS: Tool[] = [
             properties: {
               type: {
                 type: 'string',
-                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table'],
+                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table', 'diagram'],
                 description: 'Block type',
               },
               content: { type: 'string', description: 'Block content' },
@@ -58,7 +58,7 @@ export const TOOL_DEFINITIONS: Tool[] = [
             properties: {
               type: {
                 type: 'string',
-                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table'],
+                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table', 'diagram'],
               },
               content: { type: 'string' },
               meta: { type: 'object' },
@@ -86,7 +86,7 @@ export const TOOL_DEFINITIONS: Tool[] = [
             properties: {
               type: {
                 type: 'string',
-                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table'],
+                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table', 'diagram'],
               },
               content: { type: 'string' },
               meta: { type: 'object' },
@@ -190,6 +190,114 @@ export const TOOL_DEFINITIONS: Tool[] = [
       type: 'object' as const,
       properties: {},
       required: [],
+    },
+  },
+
+  // ── Diagram Tools ──────────────────────────────────
+
+  {
+    name: 'generate_diagram',
+    description: 'Create a diagram block using Mermaid syntax. Optionally add it to an existing note or create a new note.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        mermaidSyntax: { type: 'string', description: 'Valid Mermaid diagram syntax' },
+        diagramType: {
+          type: 'string',
+          enum: ['flowchart', 'sequence', 'er', 'gantt', 'class', 'state', 'pie', 'mindmap', 'timeline', 'gitgraph'],
+          description: 'Type of diagram',
+        },
+        noteId: { type: 'string', description: 'Existing note ID or title to append the diagram to' },
+        noteTitle: { type: 'string', description: 'Title for a new note (used if noteId is not provided)' },
+      },
+      required: ['mermaidSyntax', 'diagramType'],
+    },
+  },
+
+  {
+    name: 'update_diagram',
+    description: 'Update an existing diagram block with new Mermaid syntax.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        noteId: { type: 'string', description: 'Note ID or title containing the diagram' },
+        blockId: { type: 'string', description: 'Block ID of the diagram to update' },
+        mermaidSyntax: { type: 'string', description: 'New Mermaid syntax' },
+      },
+      required: ['noteId', 'blockId', 'mermaidSyntax'],
+    },
+  },
+
+  // ── Synthesis Tools (NotebookLM-style) ─────────────
+
+  {
+    name: 'get_notes_content',
+    description: 'Read the full content of multiple notes at once. Returns blocks, tags, and metadata for each note.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        noteIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Note IDs or titles to read',
+        },
+      },
+      required: ['noteIds'],
+    },
+  },
+
+  {
+    name: 'summarize_notes',
+    description: 'Create a summary note that synthesizes content from multiple source notes. Automatically adds wikilink citations and ai-summary tag.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        noteIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Source note IDs or titles to summarize',
+        },
+        summaryTitle: { type: 'string', description: 'Title for the summary note' },
+        blocks: {
+          type: 'array',
+          description: 'Blocks for the summary note',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'code', 'quote', 'callout', 'divider', 'image', 'embed', 'table', 'diagram'],
+              },
+              content: { type: 'string' },
+              meta: { type: 'object' },
+            },
+            required: ['type', 'content'],
+          },
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Additional tags for the summary note',
+        },
+      },
+      required: ['noteIds', 'summaryTitle', 'blocks'],
+    },
+  },
+
+  {
+    name: 'auto_tag',
+    description: 'Analyze a note\'s content and apply semantically relevant tags. The AI determines which tags best describe the content.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        noteId: { type: 'string', description: 'Note ID or title to tag' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags to apply based on content analysis',
+        },
+      },
+      required: ['noteId', 'tags'],
     },
   },
 ];

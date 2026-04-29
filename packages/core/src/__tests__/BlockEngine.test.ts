@@ -114,6 +114,71 @@ describe('BlockEngine', () => {
     });
   });
 
+  describe('diagram blocks', () => {
+    it('parses mermaid code blocks as Diagram type', () => {
+      const md = '```mermaid\ngraph TD\n  A --> B\n```';
+      const { blocks } = engine.parseMarkdown(md);
+      expect(blocks.length).toBe(1);
+      expect(blocks[0].type).toBe(BlockType.Diagram);
+      expect(blocks[0].content).toBe('graph TD\n  A --> B');
+      expect(blocks[0].meta.syntax).toBe('mermaid');
+      expect(blocks[0].meta.diagramType).toBe('flowchart');
+    });
+
+    it('preserves non-mermaid code blocks as Code type', () => {
+      const md = '```js\nconst x = 1;\n```';
+      const { blocks } = engine.parseMarkdown(md);
+      expect(blocks[0].type).toBe(BlockType.Code);
+    });
+
+    it('roundtrips diagram blocks through serialization', () => {
+      const md = '```mermaid\nsequenceDiagram\n  A->>B: Hello\n```';
+      const { blocks } = engine.parseMarkdown(md);
+      expect(blocks[0].type).toBe(BlockType.Diagram);
+
+      const output = engine.serializeToMarkdown(blocks);
+      expect(output).toContain('```mermaid');
+      expect(output).toContain('sequenceDiagram');
+      expect(output).toContain('A->>B: Hello');
+
+      // Re-parse should produce same block type
+      const { blocks: reparsed } = engine.parseMarkdown(output);
+      expect(reparsed[0].type).toBe(BlockType.Diagram);
+      expect(reparsed[0].meta.diagramType).toBe('sequence');
+    });
+
+    it('infers correct diagram types', () => {
+      const cases: Array<{ content: string; expected: string }> = [
+        { content: 'graph TD\n  A --> B', expected: 'flowchart' },
+        { content: 'flowchart LR\n  A --> B', expected: 'flowchart' },
+        { content: 'sequenceDiagram\n  A->>B: msg', expected: 'sequence' },
+        { content: 'erDiagram\n  CUSTOMER ||--o{ ORDER : places', expected: 'er' },
+        { content: 'gantt\n  title A Gantt', expected: 'gantt' },
+        { content: 'classDiagram\n  Class01 <|-- Class02', expected: 'class' },
+        { content: 'stateDiagram-v2\n  [*] --> Active', expected: 'state' },
+        { content: 'pie\n  "A" : 30', expected: 'pie' },
+        { content: 'mindmap\n  root((mind))', expected: 'mindmap' },
+        { content: 'timeline\n  2024 : Event', expected: 'timeline' },
+        { content: 'gitgraph\n  commit', expected: 'gitgraph' },
+        { content: 'unknown\n  stuff', expected: 'diagram' },
+      ];
+
+      for (const { content, expected } of cases) {
+        const md = '```mermaid\n' + content + '\n```';
+        const { blocks } = engine.parseMarkdown(md);
+        expect(blocks[0].meta.diagramType).toBe(expected);
+      }
+    });
+
+    it('renders diagram blocks for terminal', () => {
+      const md = '```mermaid\ngraph TD\n  A --> B\n```';
+      const { blocks } = engine.parseMarkdown(md);
+      const output = engine.renderForTerminal(blocks);
+      expect(typeof output).toBe('string');
+      expect(output.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('renderForTerminal', () => {
     it('renders without throwing', () => {
       const md = '# Heading\n\nParagraph\n\n- Bullet\n\n- [x] Todo\n\n```js\ncode\n```\n\n> Quote\n\n---';

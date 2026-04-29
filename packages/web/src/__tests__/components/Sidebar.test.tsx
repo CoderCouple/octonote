@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { AppSidebar } from '@/components/layout/Sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import type { Note } from '@/types';
+
+const today = new Date().toISOString();
 
 const mockNotes: Note[] = [
   {
@@ -10,8 +13,8 @@ const mockNotes: Note[] = [
     title: 'My First Note',
     folderId: null,
     storageFmt: 'json',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-02T00:00:00Z',
+    createdAt: today,
+    updatedAt: today,
     blocks: [],
     tags: [{ id: 'tag-1', name: 'important' }],
   },
@@ -20,8 +23,8 @@ const mockNotes: Note[] = [
     title: 'Second Note',
     folderId: null,
     storageFmt: 'json',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-03T00:00:00Z',
+    createdAt: today,
+    updatedAt: today,
     blocks: [],
     tags: [],
   },
@@ -29,7 +32,7 @@ const mockNotes: Note[] = [
 
 const mockFetchNotes = vi.fn();
 const mockCreateNote = vi.fn();
-const mockSearch = vi.fn();
+const mockDeleteNote = vi.fn();
 
 vi.mock('@/store/noteStore', () => ({
   useNoteStore: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -37,6 +40,7 @@ vi.mock('@/store/noteStore', () => ({
       notes: mockNotes,
       fetchNotes: mockFetchNotes,
       createNote: mockCreateNote,
+      deleteNote: mockDeleteNote,
     }),
 }));
 
@@ -44,61 +48,63 @@ vi.mock('@/store/uiStore', () => ({
   useUiStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       searchResults: [],
-      search: mockSearch,
+      search: vi.fn(),
     }),
 }));
 
-describe('Sidebar', () => {
+function renderSidebar() {
+  return render(
+    <MemoryRouter>
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe('AppSidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock matchMedia for useIsMobile hook
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
   });
 
-  it('renders the Notes, Search, and Tags tabs', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText('Notes')).toBeInTheDocument();
-    expect(screen.getByText('Search')).toBeInTheDocument();
-    expect(screen.getByText('Tags')).toBeInTheDocument();
+  it('renders OctoNote branding', () => {
+    renderSidebar();
+    expect(screen.getByText('OctoNote')).toBeInTheDocument();
   });
 
-  it('renders the note list', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+  it('renders note items in the sidebar', () => {
+    renderSidebar();
     expect(screen.getByText('My First Note')).toBeInTheDocument();
     expect(screen.getByText('Second Note')).toBeInTheDocument();
   });
 
   it('renders the New Note button', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
     expect(screen.getByText('New Note')).toBeInTheDocument();
   });
 
-  it('renders Graph and Daily navigation buttons', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+  it('renders Quick Links', () => {
+    renderSidebar();
     expect(screen.getByText('Graph')).toBeInTheDocument();
     expect(screen.getByText('Daily')).toBeInTheDocument();
   });
 
   it('calls fetchNotes on mount', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
     expect(mockFetchNotes).toHaveBeenCalled();
   });
 });
