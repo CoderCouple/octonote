@@ -327,7 +327,7 @@ export function NavSection({ label, icon: Icon, notes, defaultOpen = false }: Na
         {/* View mode action — hidden when sidebar is collapsed */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover className="group-data-[collapsible=icon]:hidden">
+            <SidebarMenuAction className="group-data-[collapsible=icon]:hidden">
               <ActiveViewIcon />
               <span className="sr-only">View mode</span>
             </SidebarMenuAction>
