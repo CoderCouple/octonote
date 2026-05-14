@@ -169,6 +169,20 @@ export class NoteRepository {
     return rows.length > 0 ? this.mapFolder(rows[0]) : undefined;
   }
 
+  async getFolderByName(name: string, parentId?: string | null): Promise<Folder | undefined> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM folders WHERE name = $1 AND parent_id IS NOT DISTINCT FROM $2',
+      [name, parentId ?? null]
+    );
+    return rows.length > 0 ? this.mapFolder(rows[0]) : undefined;
+  }
+
+  /** Get an existing folder by name+parent, or create it if absent. */
+  async ensureFolder(name: string, parentId?: string | null): Promise<Folder> {
+    const existing = await this.getFolderByName(name, parentId ?? null);
+    return existing ?? this.createFolder(name, parentId ?? null);
+  }
+
   async listFolders(): Promise<Folder[]> {
     const { rows } = await this.pool.query('SELECT * FROM folders ORDER BY name');
     return rows.map((r: any) => this.mapFolder(r));

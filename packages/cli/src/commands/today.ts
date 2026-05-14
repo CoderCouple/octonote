@@ -27,7 +27,7 @@ export function registerTodayCommand(program: Command, container: Container): vo
         const rendered = container.blockEngine.renderForTerminal(note.blocks);
         console.log(rendered);
       } else {
-        console.log(chalk.dim('Empty daily note. Use `octo edit` to add content.'));
+        console.log(chalk.dim('Empty daily note. Use `octonote edit` to add content.'));
       }
     });
 }

@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OctoNote is a CLI-first, block-based note-taking app (Notion meets Obsidian meets terminal). CLI command: `octo`. Vault location: `~/.octonote/`. TypeScript monorepo using npm workspaces.
+OctoNote is a CLI-first, block-based note-taking app (Notion meets Obsidian meets terminal). CLI command: `octonote`. Vault location: `~/.octonote/`. TypeScript monorepo using npm workspaces.
 
 ## Monorepo Structure
 
 ```
 packages/
   core/        — block engine, vault, SQLite, search, links (shared foundation)
-  cli/         — octo CLI + ink TUI editor
+  cli/         — octonote CLI + ink TUI editor
   ai/          — Claude-powered note creation, editing, summarization
   server/      — local Express REST + WebSocket API
   web/         — React block editor UI (Vite + Tailwind + Zustand)
@@ -76,10 +76,25 @@ paragraph, heading (1-3), bullet, numbered, todo, code, quote, callout, divider,
 
 ## Claude Code Integration
 
-No MCP server. Claude Code uses `octo` as a plain CLI tool with `--output json` for machine-readable output.
+No MCP server yet. Claude Code uses `octonote` as a plain CLI tool with `--output json` for machine-readable output.
 
 Key patterns:
-- Before architectural changes: `octo search "<topic>" --output json`
-- Before starting a task: `octo view "Project Plan" --output json`
-- After major decisions: `octo new "Decision: <X>" --tags decision`
-- Current sprint context: `octo today --output json`
+- Before architectural changes: `octonote search "<topic>" --output json`
+- Before starting a task: `octonote view "Project Plan" --output json`
+- After major decisions: `octonote new "Decision: <X>" --tags decision`
+- Current sprint context: `octonote today --output json`
+
+### The Brain (memory layer for AI agents)
+
+`octonote brain` is a per-project + global memory layer. Entries are stored as notes
+under a `Brain/<project>` folder (project = the git `origin` remote slug), tagged
+with `type:*` and `by:*` for provenance.
+
+- `octonote brain save-plan` — reads plan markdown from stdin, saves it as a `type:plan`
+  note in the current project's brain
+- `octonote brain list [--project <slug>] [-o json]` — list a project's brain entries
+- `octonote brain show <id|title> [-o json]` — view an entry
+
+**Plan capture hook:** `.claude/settings.json` wires a `PostToolUse` hook on
+`ExitPlanMode` (`.claude/hooks/save-plan.sh`) that pipes every approved plan into
+the brain automatically. Requires `octonote` on PATH — run `npm link -w packages/cli`.

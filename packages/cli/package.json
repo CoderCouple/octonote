@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "octo": "./dist/index.js"
+    "octonote": "./dist/index.js"
   },
   "main": "dist/index.js",
   "scripts": {

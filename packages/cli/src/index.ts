@@ -19,6 +19,7 @@ import { registerNewCommand } from './commands/new.js';
 import { registerEditCommand } from './commands/edit.js';
 import { registerAiCommand } from './commands/ai.js';
 import { registerServeCommand } from './commands/serve.js';
+import { registerBrainCommand } from './commands/brain.js';
 
 const DEFAULT_VAULT_PATH = path.join(os.homedir(), '.octonote');
 
@@ -45,7 +46,7 @@ function resolveDatabaseUrl(): string | null {
 async function main() {
   const program = new Command();
   program
-    .name('octo')
+    .name('octonote')
     .description('OctoNote — CLI-first block-based note-taking')
     .version('0.1.0');
 
@@ -64,7 +65,7 @@ async function main() {
     console.error(
       'No database connection configured.\n' +
         'Set the DATABASE_URL environment variable, or run:\n' +
-        '  octo config --db <postgres-connection-string>'
+        '  octonote config --db <postgres-connection-string>'
     );
     process.exit(1);
   }
@@ -91,6 +92,9 @@ async function main() {
 
   // AI
   registerAiCommand(program, container);
+
+  // Brain — memory layer for AI coding agents
+  registerBrainCommand(program, container);
 
   // Server
   registerServeCommand(program, container);

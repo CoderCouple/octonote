@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/save-plan.sh\"",
+            "timeout": 30,
+            "statusMessage": "Saving plan to OctoNote brain"
+          }
+        ]
+      }
+    ]
+  }
+}

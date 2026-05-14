@@ -64,7 +64,7 @@ export function registerAiCommand(program: Command, container: Container): void 
         // Single-shot mode
         const prompt = promptWords.join(' ');
         if (!prompt) {
-          console.error(chalk.red('Please provide a prompt. Usage: octo ai "your prompt"'));
+          console.error(chalk.red('Please provide a prompt. Usage: octonote ai "your prompt"'));
           process.exit(1);
         }
 
