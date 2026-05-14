@@ -6,43 +6,53 @@ import { createContainer, type Container } from '@octonote/core';
 import { Broadcaster } from '../ws/broadcaster';
 import { resolveNote, fullSave } from '../routes/helpers';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Route Helpers', () => {
   let tmpDir: string;
   let container: Container;
 
-  function setup(): Container {
+  async function setup(): Promise<Container> {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-helpers-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     return container;
   }
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (container) await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
   describe('resolveNote', () => {
-    it('resolves by ID', () => {
-      const c = setup();
-      const note = c.noteRepository.createNote('Test Note');
-      const resolved = resolveNote(c, note.id);
+    it('resolves by ID', async () => {
+      const c = await setup();
+      const note = await c.noteRepository.createNote('Test Note');
+      const resolved = await resolveNote(c, note.id);
       expect(resolved.id).toBe(note.id);
       expect(resolved.title).toBe('Test Note');
     });
 
-    it('resolves by title', () => {
-      const c = setup();
-      c.noteRepository.createNote('My Title');
-      const resolved = resolveNote(c, 'My Title');
+    it('resolves by title', async () => {
+      const c = await setup();
+      await c.noteRepository.createNote('My Title');
+      const resolved = await resolveNote(c, 'My Title');
       expect(resolved.title).toBe('My Title');
     });
 
-    it('throws 404 for missing note', () => {
-      const c = setup();
-      expect(() => resolveNote(c, 'nonexistent')).toThrow('Note not found');
+    it('throws 404 for missing note', async () => {
+      const c = await setup();
+      await expect(resolveNote(c, 'nonexistent')).rejects.toThrow('Note not found');
       try {
-        resolveNote(c, 'nonexistent');
+        await resolveNote(c, 'nonexistent');
       } catch (err: any) {
         expect(err.status).toBe(404);
       }
@@ -50,13 +60,13 @@ describe('Route Helpers', () => {
   });
 
   describe('fullSave', () => {
-    it('saves vault file, reindexes, syncs links, and broadcasts', () => {
-      const c = setup();
+    it('saves vault file, reindexes, syncs links, and broadcasts', async () => {
+      const c = await setup();
       const broadcaster = new Broadcaster();
       const broadcastSpy = vi.spyOn(broadcaster, 'broadcast');
 
-      const note = c.noteRepository.createNote('Save Test');
-      c.noteRepository.createBlock({
+      const note = await c.noteRepository.createNote('Save Test');
+      await c.noteRepository.createBlock({
         noteId: note.id,
         type: 'paragraph' as any,
         content: 'Hello world',
@@ -65,7 +75,7 @@ describe('Route Helpers', () => {
         parentId: null,
       });
 
-      fullSave(c, note.id, broadcaster);
+      await fullSave(c, note.id, broadcaster);
 
       expect(broadcastSpy).toHaveBeenCalledWith('note:updated', {
         noteId: note.id,
@@ -73,12 +83,12 @@ describe('Route Helpers', () => {
       });
     });
 
-    it('does nothing for missing note', () => {
-      const c = setup();
+    it('does nothing for missing note', async () => {
+      const c = await setup();
       const broadcaster = new Broadcaster();
       const broadcastSpy = vi.spyOn(broadcaster, 'broadcast');
 
-      fullSave(c, 'nonexistent-id', broadcaster);
+      await fullSave(c, 'nonexistent-id', broadcaster);
 
       expect(broadcastSpy).not.toHaveBeenCalled();
     });

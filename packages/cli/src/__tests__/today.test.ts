@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Container } from '@octonote/core';
 import { createTestContainer, captureOutput } from './helpers.js';
 import { Command } from 'commander';
@@ -8,16 +8,20 @@ describe('octo today', () => {
   let container: Container;
   let program: Command;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerTodayCommand(program, container);
   });
 
+  afterEach(async () => {
+    await container.close();
+  });
+
   it('creates and displays daily note', async () => {
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'today']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'today']);
     });
 
     const output = lines.join('\n');
@@ -25,8 +29,8 @@ describe('octo today', () => {
   });
 
   it('outputs JSON with note and streak', async () => {
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'today', '--output', 'json']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'today', '--output', 'json']);
     });
 
     const parsed = JSON.parse(lines.join('\n'));

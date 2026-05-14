@@ -10,9 +10,9 @@ export function registerSearchCommand(program: Command, container: Container): v
     .option('-t, --tag <tag>', 'Filter results by tag')
     .option('-l, --limit <n>', 'Max results', '20')
     .option('-o, --output <format>', 'Output format (json)')
-    .action((query: string, opts: { tag?: string; limit: string; output?: string }) => {
+    .action(async (query: string, opts: { tag?: string; limit: string; output?: string }) => {
       // Lazy index rebuild: load all notes into search index
-      const allNotes = container.noteRepository.listNotes();
+      const allNotes = await container.noteRepository.listNotes();
       container.searchEngine.rebuildIndex(allNotes);
 
       let results = container.searchEngine.search(query, {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -12,8 +12,8 @@ describe('octo import', () => {
   let program: Command;
   let tmpFile: string;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerImportCommand(program, container);
@@ -37,16 +37,20 @@ This is an imported note.
 `, 'utf-8');
   });
 
+  afterEach(async () => {
+    await container.close();
+  });
+
   it('imports a markdown file', async () => {
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'import', tmpFile]);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'import', tmpFile]);
     });
 
     const output = lines.join('\n');
     expect(output).toContain('Imported');
     expect(output).toContain('Imported Note');
 
-    const notes = container.noteRepository.listNotes();
+    const notes = await container.noteRepository.listNotes();
     expect(notes.length).toBe(1);
     expect(notes[0].title).toBe('Imported Note');
   });

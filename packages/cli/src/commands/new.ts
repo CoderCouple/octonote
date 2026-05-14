@@ -15,17 +15,17 @@ export function registerNewCommand(program: Command, container: Container): void
     .action(async (title: string | undefined, opts: { folder?: string; tags?: string; md?: boolean }) => {
       const noteTitle = title || `Note ${new Date().toISOString().slice(0, 16)}`;
       const fmt: StorageFormat = opts.md ? 'markdown' : 'json';
-      const note = container.noteRepository.createNote(noteTitle, opts.folder || null, fmt);
+      const note = await container.noteRepository.createNote(noteTitle, opts.folder || null, fmt);
 
       // Add tags
       if (opts.tags) {
         for (const tag of opts.tags.split(',').map(t => t.trim()).filter(Boolean)) {
-          container.noteRepository.addTagToNote(note.id, tag);
+          await container.noteRepository.addTagToNote(note.id, tag);
         }
       }
 
       // Fetch fresh note with blocks + tags
-      const fullNote = container.noteRepository.getNote(note.id)!;
+      const fullNote = (await container.noteRepository.getNote(note.id))!;
 
       console.log(chalk.dim(`Created "${noteTitle}" — opening editor...`));
 

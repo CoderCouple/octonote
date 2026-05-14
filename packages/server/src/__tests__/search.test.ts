@@ -6,19 +6,29 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Search API', () => {
   let tmpDir: string;
   let container: Container;
   let app: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-search-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -30,8 +40,8 @@ describe('Search API', () => {
   });
 
   it('GET /api/search returns matching notes', async () => {
-    const note = container.noteRepository.createNote('TypeScript Guide');
-    container.noteRepository.createBlock({
+    const note = await container.noteRepository.createNote('TypeScript Guide');
+    await container.noteRepository.createBlock({
       noteId: note.id,
       type: 'paragraph' as any,
       content: 'A guide about TypeScript',
@@ -40,7 +50,7 @@ describe('Search API', () => {
       parentId: null,
     });
 
-    container.noteRepository.createNote('Python Guide');
+    await container.noteRepository.createNote('Python Guide');
 
     const res = await request(app).get('/api/search?q=TypeScript');
     expect(res.status).toBe(200);
@@ -49,9 +59,9 @@ describe('Search API', () => {
   });
 
   it('GET /api/search respects limit', async () => {
-    container.noteRepository.createNote('Note One');
-    container.noteRepository.createNote('Note Two');
-    container.noteRepository.createNote('Note Three');
+    await container.noteRepository.createNote('Note One');
+    await container.noteRepository.createNote('Note Two');
+    await container.noteRepository.createNote('Note Three');
 
     const res = await request(app).get('/api/search?q=Note&limit=2');
     expect(res.status).toBe(200);

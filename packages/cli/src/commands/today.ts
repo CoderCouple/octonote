@@ -8,9 +8,9 @@ export function registerTodayCommand(program: Command, container: Container): vo
     .command('today')
     .description("View today's daily note")
     .option('-o, --output <format>', 'Output format (json)')
-    .action((opts: { output?: string }) => {
-      const note = container.dailyNoteService.getOrCreateToday();
-      const streak = container.dailyNoteService.getStreak();
+    .action(async (opts: { output?: string }) => {
+      const note = await container.dailyNoteService.getOrCreateToday();
+      const streak = await container.dailyNoteService.getStreak();
 
       if (isJsonOutput(opts)) {
         outputJson({ note, streak });

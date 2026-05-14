@@ -1,19 +1,32 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import Database from 'better-sqlite3';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Pool } from 'pg';
 import { initDatabase } from '../db/schema';
 import { NoteRepository } from '../db/NoteRepository';
 import { LinkGraph } from '../engine/LinkGraph';
 import { BlockType } from '../models/types';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('LinkGraph', () => {
-  let db: Database.Database;
+  let pool: Pool;
   let repo: NoteRepository;
   let graph: LinkGraph;
 
-  beforeEach(() => {
-    db = initDatabase(':memory:');
-    repo = new NoteRepository(db);
+  beforeEach(async () => {
+    pool = await initDatabase(TEST_DATABASE_URL);
+    await pool.query('DELETE FROM daily_notes');
+    await pool.query('DELETE FROM links');
+    await pool.query('DELETE FROM note_tags');
+    await pool.query('DELETE FROM blocks');
+    await pool.query('DELETE FROM notes');
+    await pool.query('DELETE FROM tags');
+    await pool.query('DELETE FROM folders');
+    repo = new NoteRepository(pool);
     graph = new LinkGraph(repo);
+  });
+
+  afterEach(async () => {
+    await pool.end();
   });
 
   describe('extractWikilinks', () => {
@@ -38,9 +51,9 @@ describe('LinkGraph', () => {
   });
 
   describe('syncLinks', () => {
-    it('creates links for wikilinks pointing to existing notes', () => {
-      const source = repo.createNote('Source');
-      const target = repo.createNote('Target');
+    it('creates links for wikilinks pointing to existing notes', async () => {
+      const source = await repo.createNote('Source');
+      const target = await repo.createNote('Target');
 
       const blocks = [{
         id: 'b1',
@@ -52,69 +65,69 @@ describe('LinkGraph', () => {
         parentId: null,
       }];
 
-      graph.syncLinks(source.id, blocks);
+      await graph.syncLinks(source.id, blocks);
 
-      const forwardLinks = graph.getForwardLinks(source.id);
+      const forwardLinks = await graph.getForwardLinks(source.id);
       expect(forwardLinks.length).toBe(1);
       expect(forwardLinks[0].targetNoteId).toBe(target.id);
     });
 
-    it('removes old links on re-sync', () => {
-      const source = repo.createNote('Source');
-      repo.createNote('Target');
+    it('removes old links on re-sync', async () => {
+      const source = await repo.createNote('Source');
+      await repo.createNote('Target');
 
-      graph.syncLinks(source.id, [{
+      await graph.syncLinks(source.id, [{
         id: 'b1', noteId: source.id, type: BlockType.Paragraph,
         content: '[[Target]]', meta: {}, position: 0, parentId: null,
       }]);
-      expect(graph.getForwardLinks(source.id).length).toBe(1);
+      expect((await graph.getForwardLinks(source.id)).length).toBe(1);
 
       // Re-sync with no wikilinks
-      graph.syncLinks(source.id, [{
+      await graph.syncLinks(source.id, [{
         id: 'b1', noteId: source.id, type: BlockType.Paragraph,
         content: 'No links now', meta: {}, position: 0, parentId: null,
       }]);
-      expect(graph.getForwardLinks(source.id).length).toBe(0);
+      expect((await graph.getForwardLinks(source.id)).length).toBe(0);
     });
   });
 
   describe('backlinks', () => {
-    it('finds backlinks', () => {
-      const note1 = repo.createNote('Note 1');
-      const note2 = repo.createNote('Note 2');
+    it('finds backlinks', async () => {
+      const note1 = await repo.createNote('Note 1');
+      const note2 = await repo.createNote('Note 2');
 
-      graph.syncLinks(note1.id, [{
+      await graph.syncLinks(note1.id, [{
         id: 'b1', noteId: note1.id, type: BlockType.Paragraph,
         content: '[[Note 2]]', meta: {}, position: 0, parentId: null,
       }]);
 
-      const backlinks = graph.getBacklinks(note2.id);
+      const backlinks = await graph.getBacklinks(note2.id);
       expect(backlinks.length).toBe(1);
       expect(backlinks[0].sourceNoteId).toBe(note1.id);
     });
   });
 
   describe('orphans', () => {
-    it('detects orphan notes', () => {
-      const note1 = repo.createNote('Connected 1');
-      const note2 = repo.createNote('Connected 2');
-      repo.createNote('Orphan');
+    it('detects orphan notes', async () => {
+      const note1 = await repo.createNote('Connected 1');
+      const note2 = await repo.createNote('Connected 2');
+      await repo.createNote('Orphan');
 
-      repo.createLink(note1.id, note2.id);
+      await repo.createLink(note1.id, note2.id);
 
-      const orphans = graph.getOrphans();
+      const orphans = await graph.getOrphans();
       expect(orphans.length).toBe(1);
       expect(orphans[0].title).toBe('Orphan');
     });
   });
 
   describe('getGraphData', () => {
-    it('returns nodes and edges', () => {
-      const n1 = repo.createNote('A');
-      const n2 = repo.createNote('B');
-      repo.createLink(n1.id, n2.id);
+    it('returns nodes and edges', async () => {
+      const n1 = await repo.createNote('A');
+      const n2 = await repo.createNote('B');
+      await repo.createLink(n1.id, n2.id);
 
-      const data = graph.getGraphData();
+      const data = await graph.getGraphData();
       expect(data.nodes.length).toBe(2);
       expect(data.edges.length).toBe(1);
       expect(data.edges[0].source).toBe(n1.id);

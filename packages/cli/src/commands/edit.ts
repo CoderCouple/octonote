@@ -10,7 +10,7 @@ export function registerEditCommand(program: Command, container: Container): voi
     .command('edit <titleOrId>')
     .description('Edit a note in the TUI editor')
     .action(async (titleOrId: string) => {
-      const note = resolveNote(container, titleOrId);
+      const note = await resolveNote(container, titleOrId);
 
       const { waitUntilExit } = render(
         React.createElement(Editor, { container, note })

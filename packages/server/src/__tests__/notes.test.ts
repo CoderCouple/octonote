@@ -6,19 +6,29 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Notes API', () => {
   let tmpDir: string;
   let container: Container;
   let app: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-notes-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -47,8 +57,8 @@ describe('Notes API', () => {
   });
 
   it('GET /api/notes/:id returns note with blocks', async () => {
-    const note = container.noteRepository.createNote('Detail Note');
-    container.noteRepository.createBlock({
+    const note = await container.noteRepository.createNote('Detail Note');
+    await container.noteRepository.createBlock({
       noteId: note.id,
       type: 'paragraph' as any,
       content: 'Block content',
@@ -69,7 +79,7 @@ describe('Notes API', () => {
   });
 
   it('PATCH /api/notes/:id updates title', async () => {
-    const note = container.noteRepository.createNote('Old Title');
+    const note = await container.noteRepository.createNote('Old Title');
     const res = await request(app)
       .patch(`/api/notes/${note.id}`)
       .send({ title: 'New Title' });
@@ -78,7 +88,7 @@ describe('Notes API', () => {
   });
 
   it('DELETE /api/notes/:id deletes note', async () => {
-    const note = container.noteRepository.createNote('To Delete');
+    const note = await container.noteRepository.createNote('To Delete');
     const res = await request(app).delete(`/api/notes/${note.id}`);
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(true);
@@ -89,9 +99,9 @@ describe('Notes API', () => {
   });
 
   it('GET /api/notes?tag= filters by tag', async () => {
-    const note = container.noteRepository.createNote('Tagged Note');
-    container.noteRepository.addTagToNote(note.id, 'work');
-    container.noteRepository.createNote('Untagged');
+    const note = await container.noteRepository.createNote('Tagged Note');
+    await container.noteRepository.addTagToNote(note.id, 'work');
+    await container.noteRepository.createNote('Untagged');
 
     const res = await request(app).get('/api/notes?tag=work');
     expect(res.status).toBe(200);
@@ -100,9 +110,9 @@ describe('Notes API', () => {
   });
 
   it('GET /api/notes?folder= filters by folder', async () => {
-    const folder = container.noteRepository.createFolder('Projects');
-    container.noteRepository.createNote('In Folder', folder.id);
-    container.noteRepository.createNote('No Folder');
+    const folder = await container.noteRepository.createFolder('Projects');
+    await container.noteRepository.createNote('In Folder', folder.id);
+    await container.noteRepository.createNote('No Folder');
 
     const res = await request(app).get(`/api/notes?folder=${folder.id}`);
     expect(res.status).toBe(200);

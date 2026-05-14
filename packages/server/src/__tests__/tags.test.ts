@@ -6,19 +6,29 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Tags API', () => {
   let tmpDir: string;
   let container: Container;
   let app: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-tags-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -31,7 +41,7 @@ describe('Tags API', () => {
   });
 
   it('POST /api/tags/notes/:id/tags adds tag to note', async () => {
-    const note = container.noteRepository.createNote('Tag Test');
+    const note = await container.noteRepository.createNote('Tag Test');
     const res = await request(app)
       .post(`/api/tags/notes/${note.id}/tags`)
       .send({ name: 'important' });
@@ -40,7 +50,7 @@ describe('Tags API', () => {
   });
 
   it('POST /api/tags/notes/:id/tags requires name', async () => {
-    const note = container.noteRepository.createNote('Tag Test');
+    const note = await container.noteRepository.createNote('Tag Test');
     const res = await request(app)
       .post(`/api/tags/notes/${note.id}/tags`)
       .send({});
@@ -48,29 +58,29 @@ describe('Tags API', () => {
   });
 
   it('DELETE /api/tags/notes/:id/tags/:tagName removes tag', async () => {
-    const note = container.noteRepository.createNote('Tag Remove');
-    container.noteRepository.addTagToNote(note.id, 'remove-me');
+    const note = await container.noteRepository.createNote('Tag Remove');
+    await container.noteRepository.addTagToNote(note.id, 'remove-me');
 
     const res = await request(app)
       .delete(`/api/tags/notes/${note.id}/tags/remove-me`);
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(true);
 
-    const tags = container.noteRepository.getNoteTags(note.id);
+    const tags = await container.noteRepository.getNoteTags(note.id);
     expect(tags).toHaveLength(0);
   });
 
   it('DELETE /api/tags/notes/:id/tags/:tagName returns 404 for missing tag', async () => {
-    const note = container.noteRepository.createNote('Tag Remove');
+    const note = await container.noteRepository.createNote('Tag Remove');
     const res = await request(app)
       .delete(`/api/tags/notes/${note.id}/tags/nonexistent`);
     expect(res.status).toBe(404);
   });
 
   it('GET /api/tags lists all tags after adding', async () => {
-    const note = container.noteRepository.createNote('Tag List');
-    container.noteRepository.addTagToNote(note.id, 'alpha');
-    container.noteRepository.addTagToNote(note.id, 'beta');
+    const note = await container.noteRepository.createNote('Tag List');
+    await container.noteRepository.addTagToNote(note.id, 'alpha');
+    await container.noteRepository.addTagToNote(note.id, 'beta');
 
     const res = await request(app).get('/api/tags');
     expect(res.status).toBe(200);

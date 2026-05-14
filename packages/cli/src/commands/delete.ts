@@ -11,7 +11,7 @@ export function registerDeleteCommand(program: Command, container: Container): v
     .description('Delete a note')
     .option('-y, --yes', 'Skip confirmation')
     .action(async (titleOrId: string, opts: { yes?: boolean }) => {
-      const note = resolveNote(container, titleOrId);
+      const note = await resolveNote(container, titleOrId);
 
       if (!opts.yes) {
         const confirmed = await confirm(`Delete "${note.title}"? (y/N) `);
@@ -22,7 +22,7 @@ export function registerDeleteCommand(program: Command, container: Container): v
       }
 
       container.searchEngine.removeNote(note.id);
-      container.noteRepository.deleteNote(note.id);
+      await container.noteRepository.deleteNote(note.id);
       console.log(`Deleted "${note.title}"`);
     });
 }

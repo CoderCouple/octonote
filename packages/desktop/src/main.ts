@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
   process.env.OCTONOTE_WEB_DIST = paths.webDist;
 
   // Bootstrap core container
-  const container = createContainer();
+  const container = await createContainer();
 
   // Start Express server on a free port (or 4242 in dev)
   const port = paths.isDev ? 4242 : await findFreePort();
@@ -53,7 +53,7 @@ async function bootstrap(): Promise<void> {
   });
 }
 
-// Single instance lock — prevent SQLite conflicts
+// Single instance lock — prevent DB conflicts
 const gotLock = app.requestSingleInstanceLock();
 
 if (!gotLock) {

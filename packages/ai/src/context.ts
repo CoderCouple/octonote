@@ -3,22 +3,23 @@ import type { Container } from '@octonote/core';
 /**
  * Build a system prompt with vault context for Claude.
  */
-export function buildSystemPrompt(container: Container): string {
+export async function buildSystemPrompt(container: Container): Promise<string> {
   const { noteRepository, linkGraph } = container;
 
   // Recent notes (up to 20)
-  const notes = noteRepository.listNotes();
+  const notes = await noteRepository.listNotes();
   const recentNotes = notes.slice(0, 20);
-  const noteSummaries = recentNotes.map(n => {
-    const tags = noteRepository.getNoteTags(n.id);
+  const noteSummaries = [];
+  for (const n of recentNotes) {
+    const tags = await noteRepository.getNoteTags(n.id);
     const tagStr = tags.length ? ` [${tags.map(t => t.name).join(', ')}]` : '';
-    return `- "${n.title}"${tagStr} (updated: ${n.updatedAt.split('T')[0]})`;
-  });
+    noteSummaries.push(`- "${n.title}"${tagStr} (updated: ${n.updatedAt.split('T')[0]})`);
+  }
 
   // Content previews — first ~500 chars of 5 most recent notes
   const contentPreviews: string[] = [];
   for (const n of recentNotes.slice(0, 5)) {
-    const fullNote = noteRepository.getNote(n.id);
+    const fullNote = await noteRepository.getNote(n.id);
     if (fullNote?.blocks?.length) {
       const textContent = fullNote.blocks
         .map(b => b.content)
@@ -29,16 +30,19 @@ export function buildSystemPrompt(container: Container): string {
   }
 
   // All tags with tag clusters
-  const allTags = noteRepository.listTags();
+  const allTags = await noteRepository.listTags();
   const tagList = allTags.map(t => t.name).join(', ');
 
   // Tag clusters — group notes by tag
   const tagClusters: string[] = [];
   for (const tag of allTags.slice(0, 15)) {
-    const taggedNotes = notes.filter(n => {
-      const noteTags = noteRepository.getNoteTags(n.id);
-      return noteTags.some(t => t.name === tag.name);
-    });
+    const taggedNotes = [];
+    for (const n of notes) {
+      const noteTags = await noteRepository.getNoteTags(n.id);
+      if (noteTags.some(t => t.name === tag.name)) {
+        taggedNotes.push(n);
+      }
+    }
     if (taggedNotes.length > 0) {
       const titles = taggedNotes.slice(0, 5).map(n => `"${n.title}"`).join(', ');
       tagClusters.push(`- #${tag.name}: ${titles}${taggedNotes.length > 5 ? ` (+${taggedNotes.length - 5} more)` : ''}`);
@@ -46,12 +50,12 @@ export function buildSystemPrompt(container: Container): string {
   }
 
   // All folders
-  const allFolders = noteRepository.listFolders();
+  const allFolders = await noteRepository.listFolders();
   const folderList = allFolders.map(f => f.name).join(', ');
 
   // Link graph summary
-  const graph = linkGraph.getGraphData();
-  const orphans = linkGraph.getOrphans();
+  const graph = await linkGraph.getGraphData();
+  const orphans = await linkGraph.getOrphans();
 
   // Hub notes — top 5 most-connected notes by link count
   const linkCounts = new Map<string, number>();

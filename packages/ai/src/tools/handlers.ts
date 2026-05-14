@@ -10,35 +10,35 @@ interface BlockInput {
 /**
  * Resolve a note by ID or title.
  */
-function resolveNote(container: Container, noteId: string): Note | undefined {
-  return container.noteRepository.getNote(noteId)
-    ?? container.noteRepository.getNoteByTitle(noteId);
+async function resolveNote(container: Container, noteId: string): Promise<Note | undefined> {
+  return (await container.noteRepository.getNote(noteId))
+    ?? (await container.noteRepository.getNoteByTitle(noteId));
 }
 
 /**
  * Run the full save cycle: vault file + search index + link sync.
  */
-function fullSave(container: Container, noteId: string): void {
-  const note = container.noteRepository.getNote(noteId);
+async function fullSave(container: Container, noteId: string): Promise<void> {
+  const note = await container.noteRepository.getNote(noteId);
   if (!note) return;
   container.vaultManager.saveNote(note, note.blocks || []);
   container.searchEngine.indexNote(note);
-  container.linkGraph.syncLinks(noteId, note.blocks || []);
+  await container.linkGraph.syncLinks(noteId, note.blocks || []);
 }
 
 // ── Mutation Handlers ───────────────────────────────────
 
-export function handleCreateNote(
+export async function handleCreateNote(
   container: Container,
   input: { title: string; blocks: BlockInput[]; tags?: string[]; folderId?: string }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = container.noteRepository.createNote(input.title, input.folderId);
+    const note = await container.noteRepository.createNote(input.title, input.folderId);
 
     // Create blocks
     for (let i = 0; i < input.blocks.length; i++) {
       const b = input.blocks[i];
-      container.noteRepository.createBlock({
+      await container.noteRepository.createBlock({
         noteId: note.id,
         type: b.type as Block['type'],
         content: b.content,
@@ -51,11 +51,11 @@ export function handleCreateNote(
     // Add tags
     if (input.tags) {
       for (const tag of input.tags) {
-        container.noteRepository.addTagToNote(note.id, tag);
+        await container.noteRepository.addTagToNote(note.id, tag);
       }
     }
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -66,20 +66,20 @@ export function handleCreateNote(
   }
 }
 
-export function handleAppendBlocks(
+export async function handleAppendBlocks(
   container: Container,
   input: { noteId: string; blocks: BlockInput[] }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
-    const existing = container.noteRepository.getBlocksByNote(note.id);
+    const existing = await container.noteRepository.getBlocksByNote(note.id);
     const startPos = existing.length;
 
     for (let i = 0; i < input.blocks.length; i++) {
       const b = input.blocks[i];
-      container.noteRepository.createBlock({
+      await container.noteRepository.createBlock({
         noteId: note.id,
         type: b.type as Block['type'],
         content: b.content,
@@ -89,7 +89,7 @@ export function handleAppendBlocks(
       });
     }
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -100,24 +100,24 @@ export function handleAppendBlocks(
   }
 }
 
-export function handleReplaceBlocks(
+export async function handleReplaceBlocks(
   container: Container,
   input: { noteId: string; blocks: BlockInput[] }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
     // Delete all existing blocks
-    const existing = container.noteRepository.getBlocksByNote(note.id);
+    const existing = await container.noteRepository.getBlocksByNote(note.id);
     for (const block of existing) {
-      container.noteRepository.deleteBlock(block.id);
+      await container.noteRepository.deleteBlock(block.id);
     }
 
     // Create new blocks
     for (let i = 0; i < input.blocks.length; i++) {
       const b = input.blocks[i];
-      container.noteRepository.createBlock({
+      await container.noteRepository.createBlock({
         noteId: note.id,
         type: b.type as Block['type'],
         content: b.content,
@@ -127,7 +127,7 @@ export function handleReplaceBlocks(
       });
     }
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -138,19 +138,19 @@ export function handleReplaceBlocks(
   }
 }
 
-export function handleTagNote(
+export async function handleTagNote(
   container: Container,
   input: { noteId: string; tags: string[] }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
     for (const tag of input.tags) {
-      container.noteRepository.addTagToNote(note.id, tag);
+      await container.noteRepository.addTagToNote(note.id, tag);
     }
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -161,16 +161,16 @@ export function handleTagNote(
   }
 }
 
-export function handleRenameNote(
+export async function handleRenameNote(
   container: Container,
   input: { noteId: string; newTitle: string }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
-    container.noteRepository.updateNote(note.id, { title: input.newTitle });
-    fullSave(container, note.id);
+    await container.noteRepository.updateNote(note.id, { title: input.newTitle });
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -181,27 +181,27 @@ export function handleRenameNote(
   }
 }
 
-export function handleDeleteBlocks(
+export async function handleDeleteBlocks(
   container: Container,
   input: { noteId: string; blockIds: string[] }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
     // Delete specified blocks
     for (const blockId of input.blockIds) {
-      container.noteRepository.deleteBlock(blockId);
+      await container.noteRepository.deleteBlock(blockId);
     }
 
     // Reorder remaining blocks
-    const remaining = container.noteRepository.getBlocksByNote(note.id);
+    const remaining = await container.noteRepository.getBlocksByNote(note.id);
     const orderedIds = remaining.map(b => b.id);
     if (orderedIds.length > 0) {
-      container.noteRepository.reorderBlocks(note.id, orderedIds);
+      await container.noteRepository.reorderBlocks(note.id, orderedIds);
     }
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -214,14 +214,18 @@ export function handleDeleteBlocks(
 
 // ── Read Handlers ───────────────────────────────────────
 
-export function handleSearchNotes(
+export async function handleSearchNotes(
   container: Container,
   input: { query: string; limit?: number }
-): ToolResult {
+): Promise<ToolResult> {
   try {
     // Rebuild index to ensure fresh results
-    const allNotes = container.noteRepository.listNotes();
-    const fullNotes = allNotes.map(n => container.noteRepository.getNote(n.id)!).filter(Boolean);
+    const allNotes = await container.noteRepository.listNotes();
+    const fullNotes = [];
+    for (const n of allNotes) {
+      const full = await container.noteRepository.getNote(n.id);
+      if (full) fullNotes.push(full);
+    }
     container.searchEngine.rebuildIndex(fullNotes);
 
     const results = container.searchEngine.search(input.query, { limit: input.limit || 10 });
@@ -234,12 +238,12 @@ export function handleSearchNotes(
   }
 }
 
-export function handleGetNote(
+export async function handleGetNote(
   container: Container,
   input: { noteId: string }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
     return {
@@ -265,9 +269,9 @@ export function handleGetNote(
   }
 }
 
-export function handleListTags(container: Container): ToolResult {
+export async function handleListTags(container: Container): Promise<ToolResult> {
   try {
-    const tags = container.noteRepository.listTags();
+    const tags = await container.noteRepository.listTags();
     return {
       success: true,
       data: tags.map(t => t.name),
@@ -277,9 +281,9 @@ export function handleListTags(container: Container): ToolResult {
   }
 }
 
-export function handleListFolders(container: Container): ToolResult {
+export async function handleListFolders(container: Container): Promise<ToolResult> {
   try {
-    const folders = container.noteRepository.listFolders();
+    const folders = await container.noteRepository.listFolders();
     return {
       success: true,
       data: folders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId })),
@@ -291,27 +295,27 @@ export function handleListFolders(container: Container): ToolResult {
 
 // ── Diagram Handlers ────────────────────────────────────
 
-export function handleGenerateDiagram(
+export async function handleGenerateDiagram(
   container: Container,
   input: { mermaidSyntax: string; diagramType: string; noteId?: string; noteTitle?: string }
-): ToolResult {
+): Promise<ToolResult> {
   try {
     let noteId: string;
 
     if (input.noteId) {
-      const note = resolveNote(container, input.noteId);
+      const note = await resolveNote(container, input.noteId);
       if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
       noteId = note.id;
     } else {
       const title = input.noteTitle || `Diagram: ${input.diagramType}`;
-      const note = container.noteRepository.createNote(title);
+      const note = await container.noteRepository.createNote(title);
       noteId = note.id;
     }
 
-    const existing = container.noteRepository.getBlocksByNote(noteId);
+    const existing = await container.noteRepository.getBlocksByNote(noteId);
     const position = existing.length;
 
-    const block = container.noteRepository.createBlock({
+    const block = await container.noteRepository.createBlock({
       noteId,
       type: 'diagram' as Block['type'],
       content: input.mermaidSyntax,
@@ -320,7 +324,7 @@ export function handleGenerateDiagram(
       parentId: null,
     });
 
-    fullSave(container, noteId);
+    await fullSave(container, noteId);
 
     return {
       success: true,
@@ -331,26 +335,26 @@ export function handleGenerateDiagram(
   }
 }
 
-export function handleUpdateDiagram(
+export async function handleUpdateDiagram(
   container: Container,
   input: { noteId: string; blockId: string; mermaidSyntax: string }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
-    const blocks = container.noteRepository.getBlocksByNote(note.id);
+    const blocks = await container.noteRepository.getBlocksByNote(note.id);
     const block = blocks.find(b => b.id === input.blockId);
     if (!block) return { success: false, error: `Block not found: ${input.blockId}` };
     if (block.type !== ('diagram' as Block['type'])) {
       return { success: false, error: `Block ${input.blockId} is not a diagram block` };
     }
 
-    container.noteRepository.updateBlock(input.blockId, {
+    await container.noteRepository.updateBlock(input.blockId, {
       content: input.mermaidSyntax,
     });
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,
@@ -363,21 +367,21 @@ export function handleUpdateDiagram(
 
 // ── Synthesis Handlers (NotebookLM-style) ───────────────
 
-export function handleGetNotesContent(
+export async function handleGetNotesContent(
   container: Container,
   input: { noteIds: string[] }
-): ToolResult {
+): Promise<ToolResult> {
   try {
     const notes: unknown[] = [];
 
     for (const noteRef of input.noteIds) {
-      const note = resolveNote(container, noteRef);
+      const note = await resolveNote(container, noteRef);
       if (!note) {
         notes.push({ id: noteRef, error: `Note not found: ${noteRef}` });
         continue;
       }
 
-      const tags = container.noteRepository.getNoteTags(note.id);
+      const tags = await container.noteRepository.getNoteTags(note.id);
       notes.push({
         id: note.id,
         title: note.title,
@@ -401,7 +405,7 @@ export function handleGetNotesContent(
   }
 }
 
-export function handleSummarizeNotes(
+export async function handleSummarizeNotes(
   container: Container,
   input: {
     noteIds: string[];
@@ -409,15 +413,15 @@ export function handleSummarizeNotes(
     blocks: BlockInput[];
     tags?: string[];
   }
-): ToolResult {
+): Promise<ToolResult> {
   try {
     // Create the summary note
-    const summaryNote = container.noteRepository.createNote(input.summaryTitle);
+    const summaryNote = await container.noteRepository.createNote(input.summaryTitle);
 
     // Create blocks
     for (let i = 0; i < input.blocks.length; i++) {
       const b = input.blocks[i];
-      container.noteRepository.createBlock({
+      await container.noteRepository.createBlock({
         noteId: summaryNote.id,
         type: b.type as Block['type'],
         content: b.content,
@@ -428,21 +432,21 @@ export function handleSummarizeNotes(
     }
 
     // Add ai-summary tag + custom tags
-    container.noteRepository.addTagToNote(summaryNote.id, 'ai-summary');
+    await container.noteRepository.addTagToNote(summaryNote.id, 'ai-summary');
     if (input.tags) {
       for (const tag of input.tags) {
-        container.noteRepository.addTagToNote(summaryNote.id, tag);
+        await container.noteRepository.addTagToNote(summaryNote.id, tag);
       }
     }
 
     // Resolve source notes for metadata
     const sourceNotes: string[] = [];
     for (const noteRef of input.noteIds) {
-      const note = resolveNote(container, noteRef);
+      const note = await resolveNote(container, noteRef);
       if (note) sourceNotes.push(note.title);
     }
 
-    fullSave(container, summaryNote.id);
+    await fullSave(container, summaryNote.id);
 
     return {
       success: true,
@@ -457,19 +461,19 @@ export function handleSummarizeNotes(
   }
 }
 
-export function handleAutoTag(
+export async function handleAutoTag(
   container: Container,
   input: { noteId: string; tags: string[] }
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const note = resolveNote(container, input.noteId);
+    const note = await resolveNote(container, input.noteId);
     if (!note) return { success: false, error: `Note not found: ${input.noteId}` };
 
     for (const tag of input.tags) {
-      container.noteRepository.addTagToNote(note.id, tag);
+      await container.noteRepository.addTagToNote(note.id, tag);
     }
 
-    fullSave(container, note.id);
+    await fullSave(container, note.id);
 
     return {
       success: true,

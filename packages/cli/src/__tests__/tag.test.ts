@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Container } from '@octonote/core';
 import { createTestContainer, captureOutput } from './helpers.js';
 import { Command } from 'commander';
@@ -8,35 +8,39 @@ describe('octo tag', () => {
   let container: Container;
   let program: Command;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerTagCommand(program, container);
   });
 
-  it('adds a tag to a note', async () => {
-    const note = container.noteRepository.createNote('Tag Test');
+  afterEach(async () => {
+    await container.close();
+  });
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'tag', 'Tag Test', 'work']);
+  it('adds a tag to a note', async () => {
+    const note = await container.noteRepository.createNote('Tag Test');
+
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'tag', 'Tag Test', 'work']);
     });
 
     const output = lines.join('\n');
     expect(output).toContain('Added');
     expect(output).toContain('work');
 
-    const tags = container.noteRepository.getNoteTags(note.id);
+    const tags = await container.noteRepository.getNoteTags(note.id);
     expect(tags.some(t => t.name === 'work')).toBe(true);
   });
 
   it('lists tags on a note', async () => {
-    const note = container.noteRepository.createNote('List Tags');
-    container.noteRepository.addTagToNote(note.id, 'alpha');
-    container.noteRepository.addTagToNote(note.id, 'beta');
+    const note = await container.noteRepository.createNote('List Tags');
+    await container.noteRepository.addTagToNote(note.id, 'alpha');
+    await container.noteRepository.addTagToNote(note.id, 'beta');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'tag', 'List Tags', '--list']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'tag', 'List Tags', '--list']);
     });
 
     const output = lines.join('\n');
@@ -45,17 +49,17 @@ describe('octo tag', () => {
   });
 
   it('removes a tag', async () => {
-    const note = container.noteRepository.createNote('Remove Tag');
-    container.noteRepository.addTagToNote(note.id, 'obsolete');
+    const note = await container.noteRepository.createNote('Remove Tag');
+    await container.noteRepository.addTagToNote(note.id, 'obsolete');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'tag', 'Remove Tag', 'obsolete', '--remove']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'tag', 'Remove Tag', 'obsolete', '--remove']);
     });
 
     const output = lines.join('\n');
     expect(output).toContain('Removed');
 
-    const tags = container.noteRepository.getNoteTags(note.id);
+    const tags = await container.noteRepository.getNoteTags(note.id);
     expect(tags.length).toBe(0);
   });
 });

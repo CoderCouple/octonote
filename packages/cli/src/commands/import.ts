@@ -8,7 +8,7 @@ export function registerImportCommand(program: Command, container: Container): v
     .command('import <file>')
     .description('Import a markdown file as a note')
     .option('-f, --folder <folderId>', 'Place in folder')
-    .action((file: string, opts: { folder?: string }) => {
+    .action(async (file: string, opts: { folder?: string }) => {
       const { vaultManager, noteRepository } = container;
       const { note: partial, blocks } = vaultManager.importFromMarkdown(file);
 
@@ -16,11 +16,11 @@ export function registerImportCommand(program: Command, container: Container): v
       const folderId = opts.folder || partial.folderId || null;
       const fmt = partial.storageFmt || 'json';
 
-      const note = noteRepository.createNote(title, folderId, fmt);
+      const note = await noteRepository.createNote(title, folderId, fmt);
 
       // Create blocks in DB
       for (const block of blocks) {
-        noteRepository.createBlock({
+        await noteRepository.createBlock({
           noteId: note.id,
           type: block.type,
           content: block.content,
@@ -35,13 +35,13 @@ export function registerImportCommand(program: Command, container: Container): v
         // Tags come from frontmatter as Tag[] but might be string[]
         for (const tag of partial.tags as any[]) {
           const name = typeof tag === 'string' ? tag : tag.name;
-          noteRepository.addTagToNote(note.id, name);
+          await noteRepository.addTagToNote(note.id, name);
         }
       }
 
       // Full note with blocks for save
-      const fullNote = noteRepository.getNote(note.id)!;
-      saveNote(container, fullNote, fullNote.blocks || []);
+      const fullNote = (await noteRepository.getNote(note.id))!;
+      await saveNote(container, fullNote, fullNote.blocks || []);
 
       console.log(`Imported "${chalk.bold(title)}" (${note.id})`);
     });

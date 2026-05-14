@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Container } from '@octonote/core';
 import { createTestContainer, captureOutput } from './helpers.js';
 import { Command } from 'commander';
@@ -8,11 +8,15 @@ describe('octo config', () => {
   let container: Container;
   let program: Command;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerConfigCommand(program, container);
+  });
+
+  afterEach(async () => {
+    await container.close();
   });
 
   it('lists config values', async () => {

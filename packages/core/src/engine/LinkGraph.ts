@@ -33,17 +33,17 @@ export class LinkGraph {
    * Sync the links table for a note based on its current blocks.
    * Removes old outbound links and creates new ones.
    */
-  syncLinks(noteId: string, blocks: Block[]): void {
+  async syncLinks(noteId: string, blocks: Block[]): Promise<void> {
     // Remove existing outbound links
-    this.repo.deleteLinksFromNote(noteId);
+    await this.repo.deleteLinksFromNote(noteId);
 
     // Extract all wikilinks from all blocks
     for (const block of blocks) {
       const wikilinks = this.extractWikilinks(block.content);
       for (const wl of wikilinks) {
-        const targetNote = this.repo.getNoteByTitle(wl.target);
+        const targetNote = await this.repo.getNoteByTitle(wl.target);
         if (targetNote) {
-          this.repo.createLink(noteId, targetNote.id, block.id, wl.alias);
+          await this.repo.createLink(noteId, targetNote.id, block.id, wl.alias);
         }
       }
     }
@@ -52,39 +52,43 @@ export class LinkGraph {
   /**
    * Get notes that link TO the given note (backlinks).
    */
-  getBacklinks(noteId: string): Link[] {
+  async getBacklinks(noteId: string): Promise<Link[]> {
     return this.repo.getBacklinks(noteId);
   }
 
   /**
    * Get notes that the given note links TO (forward links).
    */
-  getForwardLinks(noteId: string): Link[] {
+  async getForwardLinks(noteId: string): Promise<Link[]> {
     return this.repo.getLinksFromNote(noteId);
   }
 
   /**
    * Find notes with no inbound or outbound links.
    */
-  getOrphans(): Note[] {
-    const allNotes = this.repo.listNotes();
-    return allNotes.filter(note => {
-      const inbound = this.repo.getBacklinks(note.id);
-      const outbound = this.repo.getLinksFromNote(note.id);
-      return inbound.length === 0 && outbound.length === 0;
-    });
+  async getOrphans(): Promise<Note[]> {
+    const allNotes = await this.repo.listNotes();
+    const orphans: Note[] = [];
+    for (const note of allNotes) {
+      const inbound = await this.repo.getBacklinks(note.id);
+      const outbound = await this.repo.getLinksFromNote(note.id);
+      if (inbound.length === 0 && outbound.length === 0) {
+        orphans.push(note);
+      }
+    }
+    return orphans;
   }
 
   /**
    * Get graph data for visualization.
    */
-  getGraphData(): { nodes: Array<{ id: string; title: string }>; edges: Array<{ source: string; target: string }> } {
-    const allNotes = this.repo.listNotes();
+  async getGraphData(): Promise<{ nodes: Array<{ id: string; title: string }>; edges: Array<{ source: string; target: string }> }> {
+    const allNotes = await this.repo.listNotes();
     const nodes = allNotes.map(n => ({ id: n.id, title: n.title }));
     const edges: Array<{ source: string; target: string }> = [];
 
     for (const note of allNotes) {
-      const links = this.repo.getLinksFromNote(note.id);
+      const links = await this.repo.getLinksFromNote(note.id);
       for (const link of links) {
         edges.push({ source: link.sourceNoteId, target: link.targetNoteId });
       }

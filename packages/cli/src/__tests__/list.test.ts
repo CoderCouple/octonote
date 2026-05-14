@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Container } from '@octonote/core';
 import { createTestContainer, captureOutput } from './helpers.js';
 import { Command } from 'commander';
@@ -8,19 +8,23 @@ describe('octo list', () => {
   let container: Container;
   let program: Command;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerListCommand(program, container);
   });
 
-  it('lists notes', async () => {
-    container.noteRepository.createNote('Note A');
-    container.noteRepository.createNote('Note B');
+  afterEach(async () => {
+    await container.close();
+  });
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'list']);
+  it('lists notes', async () => {
+    await container.noteRepository.createNote('Note A');
+    await container.noteRepository.createNote('Note B');
+
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'list']);
     });
 
     const output = lines.join('\n');
@@ -30,10 +34,10 @@ describe('octo list', () => {
   });
 
   it('outputs JSON when --output json', async () => {
-    container.noteRepository.createNote('JSON Note');
+    await container.noteRepository.createNote('JSON Note');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'list', '--output', 'json']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'list', '--output', 'json']);
     });
 
     const parsed = JSON.parse(lines.join('\n'));
@@ -42,8 +46,8 @@ describe('octo list', () => {
   });
 
   it('shows empty message when no notes', async () => {
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'list']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'list']);
     });
 
     const output = lines.join('\n');
@@ -51,12 +55,12 @@ describe('octo list', () => {
   });
 
   it('filters by tag', async () => {
-    const note = container.noteRepository.createNote('Tagged Note');
-    container.noteRepository.addTagToNote(note.id, 'work');
-    container.noteRepository.createNote('Untagged');
+    const note = await container.noteRepository.createNote('Tagged Note');
+    await container.noteRepository.addTagToNote(note.id, 'work');
+    await container.noteRepository.createNote('Untagged');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'list', '--tag', 'work']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'list', '--tag', 'work']);
     });
 
     const output = lines.join('\n');

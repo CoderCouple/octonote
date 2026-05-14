@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Note,
@@ -11,242 +11,263 @@ import {
 } from '../models/types';
 
 export class NoteRepository {
-  private db: Database.Database;
+  private pool: Pool;
 
-  constructor(db: Database.Database) {
-    this.db = db;
+  constructor(pool: Pool) {
+    this.pool = pool;
   }
 
   // ── Notes ──────────────────────────────────────────────
 
-  createNote(title: string, folderId?: string | null, storageFmt: StorageFormat = 'json'): Note {
+  async createNote(title: string, folderId?: string | null, storageFmt: StorageFormat = 'json'): Promise<Note> {
     const id = uuidv4();
     const now = new Date().toISOString();
-    this.db.prepare(
-      'INSERT INTO notes (id, title, folder_id, storage_fmt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(id, title, folderId ?? null, storageFmt, now, now);
+    await this.pool.query(
+      'INSERT INTO notes (id, title, folder_id, storage_fmt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, title, folderId ?? null, storageFmt, now, now]
+    );
     return { id, title, folderId: folderId ?? null, storageFmt, createdAt: now, updatedAt: now };
   }
 
-  getNote(id: string): Note | undefined {
-    const row = this.db.prepare('SELECT * FROM notes WHERE id = ?').get(id) as any;
-    if (!row) return undefined;
-    const note = this.mapNote(row);
-    note.blocks = this.getBlocksByNote(id);
-    note.tags = this.getNoteTags(id);
+  async getNote(id: string): Promise<Note | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM notes WHERE id = $1', [id]);
+    if (rows.length === 0) return undefined;
+    const note = this.mapNote(rows[0]);
+    note.blocks = await this.getBlocksByNote(id);
+    note.tags = await this.getNoteTags(id);
     return note;
   }
 
-  getNoteByTitle(title: string): Note | undefined {
-    const row = this.db.prepare('SELECT * FROM notes WHERE title = ?').get(title) as any;
-    if (!row) return undefined;
-    const note = this.mapNote(row);
-    note.blocks = this.getBlocksByNote(note.id);
-    note.tags = this.getNoteTags(note.id);
+  async getNoteByTitle(title: string): Promise<Note | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM notes WHERE title = $1', [title]);
+    if (rows.length === 0) return undefined;
+    const note = this.mapNote(rows[0]);
+    note.blocks = await this.getBlocksByNote(note.id);
+    note.tags = await this.getNoteTags(note.id);
     return note;
   }
 
-  updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'folderId' | 'storageFmt'>>): void {
+  async updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'folderId' | 'storageFmt'>>): Promise<void> {
     const now = new Date().toISOString();
-    const fields: string[] = ['updated_at = ?'];
+    const fields: string[] = ['updated_at = $1'];
     const values: unknown[] = [now];
+    let paramIdx = 2;
 
-    if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
-    if (updates.folderId !== undefined) { fields.push('folder_id = ?'); values.push(updates.folderId); }
-    if (updates.storageFmt !== undefined) { fields.push('storage_fmt = ?'); values.push(updates.storageFmt); }
+    if (updates.title !== undefined) { fields.push(`title = $${paramIdx}`); values.push(updates.title); paramIdx++; }
+    if (updates.folderId !== undefined) { fields.push(`folder_id = $${paramIdx}`); values.push(updates.folderId); paramIdx++; }
+    if (updates.storageFmt !== undefined) { fields.push(`storage_fmt = $${paramIdx}`); values.push(updates.storageFmt); paramIdx++; }
 
     values.push(id);
-    this.db.prepare(`UPDATE notes SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    await this.pool.query(`UPDATE notes SET ${fields.join(', ')} WHERE id = $${paramIdx}`, values);
   }
 
-  deleteNote(id: string): void {
-    this.db.prepare('DELETE FROM notes WHERE id = ?').run(id);
+  async deleteNote(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM notes WHERE id = $1', [id]);
   }
 
-  listNotes(options?: { folderId?: string; tag?: string }): Note[] {
+  async listNotes(options?: { folderId?: string; tag?: string }): Promise<Note[]> {
     let sql = 'SELECT DISTINCT n.* FROM notes n';
     const params: unknown[] = [];
+    let paramIdx = 1;
 
     if (options?.tag) {
       sql += ' JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.id';
-      sql += ' WHERE t.name = ?';
+      sql += ` WHERE t.name = $${paramIdx}`;
       params.push(options.tag);
+      paramIdx++;
       if (options.folderId) {
-        sql += ' AND n.folder_id = ?';
+        sql += ` AND n.folder_id = $${paramIdx}`;
         params.push(options.folderId);
+        paramIdx++;
       }
     } else if (options?.folderId) {
-      sql += ' WHERE n.folder_id = ?';
+      sql += ` WHERE n.folder_id = $${paramIdx}`;
       params.push(options.folderId);
+      paramIdx++;
     }
 
     sql += ' ORDER BY n.updated_at DESC';
-    const rows = this.db.prepare(sql).all(...params) as any[];
-    return rows.map(r => this.mapNote(r));
+    const { rows } = await this.pool.query(sql, params);
+    return rows.map((r: any) => this.mapNote(r));
   }
 
   // ── Blocks ─────────────────────────────────────────────
 
-  createBlock(block: Omit<Block, 'id'>): Block {
+  async createBlock(block: Omit<Block, 'id'>): Promise<Block> {
     const id = uuidv4();
-    this.db.prepare(
-      'INSERT INTO blocks (id, note_id, type, content, meta, position, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, block.noteId, block.type, block.content, JSON.stringify(block.meta), block.position, block.parentId);
+    await this.pool.query(
+      'INSERT INTO blocks (id, note_id, type, content, meta, position, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, block.noteId, block.type, block.content, JSON.stringify(block.meta), block.position, block.parentId]
+    );
     return { id, ...block };
   }
 
-  getBlocksByNote(noteId: string): Block[] {
-    const rows = this.db.prepare(
-      'SELECT * FROM blocks WHERE note_id = ? ORDER BY position ASC'
-    ).all(noteId) as any[];
-    return rows.map(r => this.mapBlock(r));
+  async getBlocksByNote(noteId: string): Promise<Block[]> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM blocks WHERE note_id = $1 ORDER BY position ASC',
+      [noteId]
+    );
+    return rows.map((r: any) => this.mapBlock(r));
   }
 
-  updateBlock(id: string, updates: Partial<Pick<Block, 'type' | 'content' | 'meta' | 'position' | 'parentId'>>): void {
+  async updateBlock(id: string, updates: Partial<Pick<Block, 'type' | 'content' | 'meta' | 'position' | 'parentId'>>): Promise<void> {
     const fields: string[] = [];
     const values: unknown[] = [];
+    let paramIdx = 1;
 
-    if (updates.type !== undefined) { fields.push('type = ?'); values.push(updates.type); }
-    if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
-    if (updates.meta !== undefined) { fields.push('meta = ?'); values.push(JSON.stringify(updates.meta)); }
-    if (updates.position !== undefined) { fields.push('position = ?'); values.push(updates.position); }
-    if (updates.parentId !== undefined) { fields.push('parent_id = ?'); values.push(updates.parentId); }
+    if (updates.type !== undefined) { fields.push(`type = $${paramIdx}`); values.push(updates.type); paramIdx++; }
+    if (updates.content !== undefined) { fields.push(`content = $${paramIdx}`); values.push(updates.content); paramIdx++; }
+    if (updates.meta !== undefined) { fields.push(`meta = $${paramIdx}`); values.push(JSON.stringify(updates.meta)); paramIdx++; }
+    if (updates.position !== undefined) { fields.push(`position = $${paramIdx}`); values.push(updates.position); paramIdx++; }
+    if (updates.parentId !== undefined) { fields.push(`parent_id = $${paramIdx}`); values.push(updates.parentId); paramIdx++; }
 
     if (fields.length === 0) return;
     values.push(id);
-    this.db.prepare(`UPDATE blocks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    await this.pool.query(`UPDATE blocks SET ${fields.join(', ')} WHERE id = $${paramIdx}`, values);
 
     // Update parent note's updated_at
-    const block = this.db.prepare('SELECT note_id FROM blocks WHERE id = ?').get(id) as any;
-    if (block) {
-      this.db.prepare('UPDATE notes SET updated_at = ? WHERE id = ?').run(new Date().toISOString(), block.note_id);
+    const { rows } = await this.pool.query('SELECT note_id FROM blocks WHERE id = $1', [id]);
+    if (rows.length > 0) {
+      await this.pool.query('UPDATE notes SET updated_at = $1 WHERE id = $2', [new Date().toISOString(), rows[0].note_id]);
     }
   }
 
-  deleteBlock(id: string): void {
-    this.db.prepare('DELETE FROM blocks WHERE id = ?').run(id);
+  async deleteBlock(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM blocks WHERE id = $1', [id]);
   }
 
-  reorderBlocks(noteId: string, blockIds: string[]): void {
-    const stmt = this.db.prepare('UPDATE blocks SET position = ? WHERE id = ? AND note_id = ?');
-    const txn = this.db.transaction(() => {
-      blockIds.forEach((blockId, i) => stmt.run(i, blockId, noteId));
-    });
-    txn();
+  async reorderBlocks(noteId: string, blockIds: string[]): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < blockIds.length; i++) {
+        await client.query('UPDATE blocks SET position = $1 WHERE id = $2 AND note_id = $3', [i, blockIds[i], noteId]);
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   // ── Folders ────────────────────────────────────────────
 
-  createFolder(name: string, parentId?: string | null): Folder {
+  async createFolder(name: string, parentId?: string | null): Promise<Folder> {
     const id = uuidv4();
     const now = new Date().toISOString();
-    this.db.prepare(
-      'INSERT INTO folders (id, name, parent_id, created_at) VALUES (?, ?, ?, ?)'
-    ).run(id, name, parentId ?? null, now);
+    await this.pool.query(
+      'INSERT INTO folders (id, name, parent_id, created_at) VALUES ($1, $2, $3, $4)',
+      [id, name, parentId ?? null, now]
+    );
     return { id, name, parentId: parentId ?? null, createdAt: now };
   }
 
-  getFolder(id: string): Folder | undefined {
-    const row = this.db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as any;
-    return row ? this.mapFolder(row) : undefined;
+  async getFolder(id: string): Promise<Folder | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM folders WHERE id = $1', [id]);
+    return rows.length > 0 ? this.mapFolder(rows[0]) : undefined;
   }
 
-  listFolders(): Folder[] {
-    const rows = this.db.prepare('SELECT * FROM folders ORDER BY name').all() as any[];
-    return rows.map(r => this.mapFolder(r));
+  async listFolders(): Promise<Folder[]> {
+    const { rows } = await this.pool.query('SELECT * FROM folders ORDER BY name');
+    return rows.map((r: any) => this.mapFolder(r));
   }
 
-  deleteFolder(id: string): void {
-    this.db.prepare('DELETE FROM folders WHERE id = ?').run(id);
+  async deleteFolder(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM folders WHERE id = $1', [id]);
   }
 
   // ── Tags ───────────────────────────────────────────────
 
-  createTag(name: string): Tag {
+  async createTag(name: string): Promise<Tag> {
     const id = uuidv4();
-    this.db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(id, name);
+    await this.pool.query('INSERT INTO tags (id, name) VALUES ($1, $2)', [id, name]);
     return { id, name };
   }
 
-  getTag(id: string): Tag | undefined {
-    const row = this.db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as any;
-    return row ? { id: row.id, name: row.name } : undefined;
+  async getTag(id: string): Promise<Tag | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM tags WHERE id = $1', [id]);
+    return rows.length > 0 ? { id: rows[0].id, name: rows[0].name } : undefined;
   }
 
-  getTagByName(name: string): Tag | undefined {
-    const row = this.db.prepare('SELECT * FROM tags WHERE name = ?').get(name) as any;
-    return row ? { id: row.id, name: row.name } : undefined;
+  async getTagByName(name: string): Promise<Tag | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM tags WHERE name = $1', [name]);
+    return rows.length > 0 ? { id: rows[0].id, name: rows[0].name } : undefined;
   }
 
-  listTags(): Tag[] {
-    const rows = this.db.prepare('SELECT * FROM tags ORDER BY name').all() as any[];
-    return rows.map(r => ({ id: r.id, name: r.name }));
+  async listTags(): Promise<Tag[]> {
+    const { rows } = await this.pool.query('SELECT * FROM tags ORDER BY name');
+    return rows.map((r: any) => ({ id: r.id, name: r.name }));
   }
 
-  addTagToNote(noteId: string, tagName: string): Tag {
-    let tag = this.getTagByName(tagName);
-    if (!tag) tag = this.createTag(tagName);
-    this.db.prepare(
-      'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)'
-    ).run(noteId, tag.id);
+  async addTagToNote(noteId: string, tagName: string): Promise<Tag> {
+    let tag = await this.getTagByName(tagName);
+    if (!tag) tag = await this.createTag(tagName);
+    await this.pool.query(
+      'INSERT INTO note_tags (note_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [noteId, tag.id]
+    );
     return tag;
   }
 
-  removeTagFromNote(noteId: string, tagId: string): void {
-    this.db.prepare('DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?').run(noteId, tagId);
+  async removeTagFromNote(noteId: string, tagId: string): Promise<void> {
+    await this.pool.query('DELETE FROM note_tags WHERE note_id = $1 AND tag_id = $2', [noteId, tagId]);
   }
 
-  getNoteTags(noteId: string): Tag[] {
-    const rows = this.db.prepare(
-      'SELECT t.* FROM tags t JOIN note_tags nt ON t.id = nt.tag_id WHERE nt.note_id = ?'
-    ).all(noteId) as any[];
-    return rows.map(r => ({ id: r.id, name: r.name }));
+  async getNoteTags(noteId: string): Promise<Tag[]> {
+    const { rows } = await this.pool.query(
+      'SELECT t.* FROM tags t JOIN note_tags nt ON t.id = nt.tag_id WHERE nt.note_id = $1',
+      [noteId]
+    );
+    return rows.map((r: any) => ({ id: r.id, name: r.name }));
   }
 
   // ── Links ──────────────────────────────────────────────
 
-  createLink(sourceNoteId: string, targetNoteId: string, sourceBlockId?: string | null, alias?: string | null): Link {
+  async createLink(sourceNoteId: string, targetNoteId: string, sourceBlockId?: string | null, alias?: string | null): Promise<Link> {
     const id = uuidv4();
-    this.db.prepare(
-      'INSERT INTO links (id, source_note_id, target_note_id, source_block_id, alias) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, sourceNoteId, targetNoteId, sourceBlockId ?? null, alias ?? null);
+    await this.pool.query(
+      'INSERT INTO links (id, source_note_id, target_note_id, source_block_id, alias) VALUES ($1, $2, $3, $4, $5)',
+      [id, sourceNoteId, targetNoteId, sourceBlockId ?? null, alias ?? null]
+    );
     return { id, sourceNoteId, targetNoteId, sourceBlockId: sourceBlockId ?? null, alias: alias ?? null };
   }
 
-  getLinksFromNote(noteId: string): Link[] {
-    const rows = this.db.prepare('SELECT * FROM links WHERE source_note_id = ?').all(noteId) as any[];
-    return rows.map(r => this.mapLink(r));
+  async getLinksFromNote(noteId: string): Promise<Link[]> {
+    const { rows } = await this.pool.query('SELECT * FROM links WHERE source_note_id = $1', [noteId]);
+    return rows.map((r: any) => this.mapLink(r));
   }
 
-  getBacklinks(noteId: string): Link[] {
-    const rows = this.db.prepare('SELECT * FROM links WHERE target_note_id = ?').all(noteId) as any[];
-    return rows.map(r => this.mapLink(r));
+  async getBacklinks(noteId: string): Promise<Link[]> {
+    const { rows } = await this.pool.query('SELECT * FROM links WHERE target_note_id = $1', [noteId]);
+    return rows.map((r: any) => this.mapLink(r));
   }
 
-  deleteLink(id: string): void {
-    this.db.prepare('DELETE FROM links WHERE id = ?').run(id);
+  async deleteLink(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM links WHERE id = $1', [id]);
   }
 
-  deleteLinksFromNote(noteId: string): void {
-    this.db.prepare('DELETE FROM links WHERE source_note_id = ?').run(noteId);
+  async deleteLinksFromNote(noteId: string): Promise<void> {
+    await this.pool.query('DELETE FROM links WHERE source_note_id = $1', [noteId]);
   }
 
   // ── Daily Notes ────────────────────────────────────────
 
-  getDailyNote(date: string): DailyNote | undefined {
-    const row = this.db.prepare('SELECT * FROM daily_notes WHERE date = ?').get(date) as any;
-    return row ? { date: row.date, noteId: row.note_id } : undefined;
+  async getDailyNote(date: string): Promise<DailyNote | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM daily_notes WHERE date = $1', [date]);
+    return rows.length > 0 ? { date: rows[0].date, noteId: rows[0].note_id } : undefined;
   }
 
-  createDailyNote(date: string, noteId: string): DailyNote {
-    this.db.prepare('INSERT INTO daily_notes (date, note_id) VALUES (?, ?)').run(date, noteId);
+  async createDailyNote(date: string, noteId: string): Promise<DailyNote> {
+    await this.pool.query('INSERT INTO daily_notes (date, note_id) VALUES ($1, $2)', [date, noteId]);
     return { date, noteId };
   }
 
-  getStreak(): number {
-    const rows = this.db.prepare(
+  async getStreak(): Promise<number> {
+    const { rows } = await this.pool.query(
       'SELECT date FROM daily_notes ORDER BY date DESC'
-    ).all() as any[];
+    );
 
     if (rows.length === 0) return 0;
 

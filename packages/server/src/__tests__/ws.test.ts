@@ -7,20 +7,29 @@ import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 import type { Server } from 'http';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('WebSocket', () => {
   let tmpDir: string;
   let container: Container;
   let server: Server;
   let port: number;
 
-  beforeEach((ctx) => {
-    return new Promise<void>((resolve) => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-ws-'));
-      container = createContainer(tmpDir);
-      const srv = createServer(container);
-      server = srv.server;
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-ws-'));
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
+    const srv = createServer(container);
+    server = srv.server;
 
-      // Listen on random port
+    // Listen on random port
+    await new Promise<void>((resolve) => {
       server.listen(0, () => {
         const addr = server.address() as any;
         port = addr.port;
@@ -29,8 +38,9 @@ describe('WebSocket', () => {
     });
   });
 
-  afterEach(() => {
-    return new Promise<void>((resolve) => {
+  afterEach(async () => {
+    await container.close();
+    await new Promise<void>((resolve) => {
       server.close(() => {
         if (tmpDir && fs.existsSync(tmpDir)) {
           fs.rmSync(tmpDir, { recursive: true, force: true });

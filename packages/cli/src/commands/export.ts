@@ -8,8 +8,8 @@ export function registerExportCommand(program: Command, container: Container): v
   program
     .command('export <titleOrId> [dest]')
     .description('Export a note as markdown')
-    .action((titleOrId: string, dest: string | undefined) => {
-      const note = resolveNote(container, titleOrId);
+    .action(async (titleOrId: string, dest: string | undefined) => {
+      const note = await resolveNote(container, titleOrId);
       const blocks = note.blocks || [];
       const safeTitle = note.title.replace(/[<>:"/\\|?*]/g, '_');
       const destPath = dest || path.resolve(`./${safeTitle}.md`);

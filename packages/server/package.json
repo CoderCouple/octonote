@@ -5,6 +5,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "start": "node dist/main.js",
     "test": "vitest run"
   },
   "dependencies": {

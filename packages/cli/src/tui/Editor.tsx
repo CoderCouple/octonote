@@ -130,10 +130,10 @@ export function Editor({ container, note }: EditorProps): React.ReactElement {
     dirty: false,
   });
 
-  const doSave = useCallback(() => {
-    const freshNote = container.noteRepository.getNote(state.noteId);
+  const doSave = useCallback(async () => {
+    const freshNote = await container.noteRepository.getNote(state.noteId);
     if (freshNote) {
-      saveNoteUtil(container, freshNote, state.blocks);
+      await saveNoteUtil(container, freshNote, state.blocks);
       dispatch({ type: 'MARK_SAVED' });
     }
   }, [container, state.noteId, state.blocks]);
@@ -250,23 +250,23 @@ export function Editor({ container, note }: EditorProps): React.ReactElement {
     dispatch({ type: 'SET_MODE', mode: 'insert' });
   }, [state.blocks, state.cursorIndex]);
 
-  const handleTagsChange = useCallback((tags: string[]) => {
+  const handleTagsChange = useCallback(async (tags: string[]) => {
     dispatch({ type: 'SET_TAGS', tags });
     // Sync tags to DB
-    const currentTags = container.noteRepository.getNoteTags(state.noteId);
-    const currentNames = new Set(currentTags.map(t => t.name));
+    const currentTags = await container.noteRepository.getNoteTags(state.noteId);
+    const currentNames = new Set(currentTags.map((t: { name: string }) => t.name));
     const newNames = new Set(tags);
 
     // Add new tags
     for (const name of tags) {
       if (!currentNames.has(name)) {
-        container.noteRepository.addTagToNote(state.noteId, name);
+        await container.noteRepository.addTagToNote(state.noteId, name);
       }
     }
     // Remove deleted tags
     for (const tag of currentTags) {
       if (!newNames.has(tag.name)) {
-        container.noteRepository.removeTagFromNote(state.noteId, tag.id);
+        await container.noteRepository.removeTagFromNote(state.noteId, tag.id);
       }
     }
   }, [container, state.noteId]);

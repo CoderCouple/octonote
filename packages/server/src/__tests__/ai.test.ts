@@ -6,6 +6,8 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 // Mock the AI modules
 vi.mock('@octonote/ai', () => {
   const mockRun = vi.fn();
@@ -27,15 +29,23 @@ describe('AI API', () => {
   let container: Container;
   let app: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-ai-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

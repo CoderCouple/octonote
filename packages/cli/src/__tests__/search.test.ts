@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Container, BlockType } from '@octonote/core';
 import { createTestContainer, captureOutput } from './helpers.js';
 import { Command } from 'commander';
@@ -8,16 +8,20 @@ describe('octo search', () => {
   let container: Container;
   let program: Command;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerSearchCommand(program, container);
   });
 
+  afterEach(async () => {
+    await container.close();
+  });
+
   it('finds notes by title', async () => {
-    const note = container.noteRepository.createNote('TypeScript Guide');
-    container.noteRepository.createBlock({
+    const note = await container.noteRepository.createNote('TypeScript Guide');
+    await container.noteRepository.createBlock({
       noteId: note.id,
       type: 'paragraph' as BlockType,
       content: 'Learn TypeScript basics',
@@ -26,8 +30,8 @@ describe('octo search', () => {
       parentId: null,
     });
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'search', 'TypeScript']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'search', 'TypeScript']);
     });
 
     const output = lines.join('\n');
@@ -35,10 +39,10 @@ describe('octo search', () => {
   });
 
   it('outputs JSON results', async () => {
-    container.noteRepository.createNote('Search Test');
+    await container.noteRepository.createNote('Search Test');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'search', 'Search', '--output', 'json']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'search', 'Search', '--output', 'json']);
     });
 
     const parsed = JSON.parse(lines.join('\n'));
@@ -47,8 +51,8 @@ describe('octo search', () => {
   });
 
   it('shows empty message for no results', async () => {
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'search', 'zzzznonexistent']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'search', 'zzzznonexistent']);
     });
 
     const output = lines.join('\n');

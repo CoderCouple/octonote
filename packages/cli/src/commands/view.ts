@@ -9,8 +9,8 @@ export function registerViewCommand(program: Command, container: Container): voi
     .command('view <titleOrId>')
     .description('View a note')
     .option('-o, --output <format>', 'Output format (json)')
-    .action((titleOrId: string, opts: { output?: string }) => {
-      const note = resolveNote(container, titleOrId);
+    .action(async (titleOrId: string, opts: { output?: string }) => {
+      const note = await resolveNote(container, titleOrId);
 
       if (isJsonOutput(opts)) {
         outputJson(note);

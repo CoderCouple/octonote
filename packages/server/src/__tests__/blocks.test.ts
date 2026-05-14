@@ -6,22 +6,32 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Blocks API', () => {
   let tmpDir: string;
   let container: Container;
   let app: any;
   let noteId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-blocks-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
-    const note = container.noteRepository.createNote('Block Test');
+    const note = await container.noteRepository.createNote('Block Test');
     noteId = note.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -51,7 +61,7 @@ describe('Blocks API', () => {
 
   it('PUT /api/notes/:id/blocks replaces all blocks', async () => {
     // Create initial blocks
-    container.noteRepository.createBlock({
+    await container.noteRepository.createBlock({
       noteId,
       type: 'paragraph' as any,
       content: 'Old',
@@ -72,13 +82,13 @@ describe('Blocks API', () => {
     expect(res.body[0].content).toBe('Replaced');
 
     // Verify old block is gone
-    const blocks = container.noteRepository.getBlocksByNote(noteId);
+    const blocks = await container.noteRepository.getBlocksByNote(noteId);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].content).toBe('Replaced');
   });
 
   it('PATCH /api/notes/:id/blocks/:blockId updates a block', async () => {
-    const block = container.noteRepository.createBlock({
+    const block = await container.noteRepository.createBlock({
       noteId,
       type: 'paragraph' as any,
       content: 'Original',
@@ -95,7 +105,7 @@ describe('Blocks API', () => {
   });
 
   it('DELETE /api/notes/:id/blocks/:blockId deletes and reorders', async () => {
-    const b1 = container.noteRepository.createBlock({
+    const b1 = await container.noteRepository.createBlock({
       noteId,
       type: 'paragraph' as any,
       content: 'First',
@@ -103,7 +113,7 @@ describe('Blocks API', () => {
       position: 0,
       parentId: null,
     });
-    const b2 = container.noteRepository.createBlock({
+    const b2 = await container.noteRepository.createBlock({
       noteId,
       type: 'paragraph' as any,
       content: 'Second',
@@ -117,7 +127,7 @@ describe('Blocks API', () => {
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(true);
 
-    const blocks = container.noteRepository.getBlocksByNote(noteId);
+    const blocks = await container.noteRepository.getBlocksByNote(noteId);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].id).toBe(b2.id);
     expect(blocks[0].position).toBe(0);

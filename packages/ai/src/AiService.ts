@@ -28,7 +28,7 @@ export class AiService {
     const shouldStream = options.stream !== false;
     const onStream = options.onStream;
 
-    const systemPrompt = buildSystemPrompt(this.container);
+    const systemPrompt = await buildSystemPrompt(this.container);
     const toolCalls: ToolCallRecord[] = [];
     const affectedNotes = new Set<string>();
     const sources = new Set<string>();
@@ -86,7 +86,7 @@ export class AiService {
       // Execute each tool and collect results
       const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
       for (const toolUse of toolUseBlocks) {
-        const result = executeTool(
+        const result = await executeTool(
           this.container,
           toolUse.name,
           toolUse.input as Record<string, unknown>

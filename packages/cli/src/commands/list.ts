@@ -11,8 +11,8 @@ export function registerListCommand(program: Command, container: Container): voi
     .option('-f, --folder <folderId>', 'Filter by folder')
     .option('-t, --tag <tag>', 'Filter by tag')
     .option('-o, --output <format>', 'Output format (json)')
-    .action((opts: { folder?: string; tag?: string; output?: string }) => {
-      const notes = container.noteRepository.listNotes({
+    .action(async (opts: { folder?: string; tag?: string; output?: string }) => {
+      const notes = await container.noteRepository.listNotes({
         folderId: opts.folder,
         tag: opts.tag,
       });

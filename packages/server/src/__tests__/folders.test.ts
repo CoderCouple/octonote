@@ -6,19 +6,29 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Folders API', () => {
   let tmpDir: string;
   let container: Container;
   let app: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-folders-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -47,7 +57,7 @@ describe('Folders API', () => {
   });
 
   it('PATCH /api/folders/:id renames folder', async () => {
-    const folder = container.noteRepository.createFolder('Old Name');
+    const folder = await container.noteRepository.createFolder('Old Name');
     const res = await request(app)
       .patch(`/api/folders/${folder.id}`)
       .send({ name: 'New Name' });
@@ -63,12 +73,12 @@ describe('Folders API', () => {
   });
 
   it('DELETE /api/folders/:id deletes folder', async () => {
-    const folder = container.noteRepository.createFolder('To Delete');
+    const folder = await container.noteRepository.createFolder('To Delete');
     const res = await request(app).delete(`/api/folders/${folder.id}`);
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(true);
 
-    const check = container.noteRepository.getFolder(folder.id);
+    const check = await container.noteRepository.getFolder(folder.id);
     expect(check).toBeUndefined();
   });
 

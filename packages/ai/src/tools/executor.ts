@@ -21,11 +21,11 @@ import {
 /**
  * Dispatch a tool call to the appropriate handler.
  */
-export function executeTool(
+export async function executeTool(
   container: Container,
   toolName: string,
   input: Record<string, unknown>
-): ToolResult {
+): Promise<ToolResult> {
   switch (toolName) {
     case 'create_note':
       return handleCreateNote(container, input as any);

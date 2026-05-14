@@ -23,7 +23,7 @@ export function aiRouter(container: Container, broadcaster: Broadcaster): Router
 
       // Trigger fullSave for any affected notes
       for (const noteId of result.affectedNotes) {
-        fullSave(container, noteId, broadcaster);
+        await fullSave(container, noteId, broadcaster);
       }
 
       res.json(result);
@@ -60,7 +60,7 @@ export function aiRouter(container: Container, broadcaster: Broadcaster): Router
 
       // Trigger fullSave for any affected notes
       for (const noteId of result.affectedNotes) {
-        fullSave(container, noteId, broadcaster);
+        await fullSave(container, noteId, broadcaster);
       }
 
       // Send final result

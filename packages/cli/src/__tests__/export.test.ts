@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -12,17 +12,21 @@ describe('octo export', () => {
   let program: Command;
   let tmpDir: string;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerExportCommand(program, container);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octo-export-'));
   });
 
+  afterEach(async () => {
+    await container.close();
+  });
+
   it('exports a note as markdown', async () => {
-    const note = container.noteRepository.createNote('Export Test');
-    container.noteRepository.createBlock({
+    const note = await container.noteRepository.createNote('Export Test');
+    await container.noteRepository.createBlock({
       noteId: note.id,
       type: 'paragraph' as BlockType,
       content: 'Hello world',
@@ -33,8 +37,8 @@ describe('octo export', () => {
 
     const dest = path.join(tmpDir, 'exported.md');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'export', 'Export Test', dest]);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'export', 'Export Test', dest]);
     });
 
     const output = lines.join('\n');

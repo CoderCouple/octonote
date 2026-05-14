@@ -6,30 +6,40 @@ import request from 'supertest';
 import { createContainer, type Container } from '@octonote/core';
 import { createServer } from '../index';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 describe('Links API', () => {
   let tmpDir: string;
   let container: Container;
   let app: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-server-links-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     const srv = createServer(container);
     app = srv.app;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
   it('GET /api/notes/:id/links returns forward and backlinks', async () => {
-    const noteA = container.noteRepository.createNote('Note A');
-    const noteB = container.noteRepository.createNote('Note B');
+    const noteA = await container.noteRepository.createNote('Note A');
+    const noteB = await container.noteRepository.createNote('Note B');
 
     // Create a wikilink from A -> B
-    const block = container.noteRepository.createBlock({
+    const block = await container.noteRepository.createBlock({
       noteId: noteA.id,
       type: 'paragraph' as any,
       content: 'See [[Note B]]',
@@ -37,7 +47,7 @@ describe('Links API', () => {
       position: 0,
       parentId: null,
     });
-    container.linkGraph.syncLinks(noteA.id, [block]);
+    await container.linkGraph.syncLinks(noteA.id, [block]);
 
     const resA = await request(app).get(`/api/notes/${noteA.id}/links`);
     expect(resA.status).toBe(200);
@@ -51,10 +61,10 @@ describe('Links API', () => {
   });
 
   it('GET /api/graph returns nodes and edges', async () => {
-    const noteA = container.noteRepository.createNote('Graph A');
-    const noteB = container.noteRepository.createNote('Graph B');
+    const noteA = await container.noteRepository.createNote('Graph A');
+    const noteB = await container.noteRepository.createNote('Graph B');
 
-    const block = container.noteRepository.createBlock({
+    const block = await container.noteRepository.createBlock({
       noteId: noteA.id,
       type: 'paragraph' as any,
       content: 'Link to [[Graph B]]',
@@ -62,7 +72,7 @@ describe('Links API', () => {
       position: 0,
       parentId: null,
     });
-    container.linkGraph.syncLinks(noteA.id, [block]);
+    await container.linkGraph.syncLinks(noteA.id, [block]);
 
     const res = await request(app).get('/api/graph');
     expect(res.status).toBe(200);

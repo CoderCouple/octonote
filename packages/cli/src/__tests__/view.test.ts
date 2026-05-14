@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Container, BlockType } from '@octonote/core';
 import { createTestContainer, captureOutput } from './helpers.js';
 import { Command } from 'commander';
@@ -8,16 +8,20 @@ describe('octo view', () => {
   let container: Container;
   let program: Command;
 
-  beforeEach(() => {
-    container = createTestContainer();
+  beforeEach(async () => {
+    container = await createTestContainer();
     program = new Command();
     program.exitOverride();
     registerViewCommand(program, container);
   });
 
+  afterEach(async () => {
+    await container.close();
+  });
+
   it('displays a note in terminal format', async () => {
-    const note = container.noteRepository.createNote('Hello World');
-    container.noteRepository.createBlock({
+    const note = await container.noteRepository.createNote('Hello World');
+    await container.noteRepository.createBlock({
       noteId: note.id,
       type: 'paragraph' as BlockType,
       content: 'This is a test',
@@ -26,8 +30,8 @@ describe('octo view', () => {
       parentId: null,
     });
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'view', 'Hello World']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'view', 'Hello World']);
     });
 
     const output = lines.join('\n');
@@ -36,10 +40,10 @@ describe('octo view', () => {
   });
 
   it('outputs JSON when --output json', async () => {
-    const note = container.noteRepository.createNote('JSON Test');
+    const note = await container.noteRepository.createNote('JSON Test');
 
-    const lines = await captureOutput(() => {
-      program.parse(['node', 'test', 'view', 'JSON Test', '--output', 'json']);
+    const lines = await captureOutput(async () => {
+      await program.parseAsync(['node', 'test', 'view', 'JSON Test', '--output', 'json']);
     });
 
     const parsed = JSON.parse(lines.join('\n'));

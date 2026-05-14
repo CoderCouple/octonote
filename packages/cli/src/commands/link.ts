@@ -7,11 +7,11 @@ export function registerLinkCommand(program: Command, container: Container): voi
   program
     .command('link <titleOrId>')
     .description('Show links for a note')
-    .action((titleOrId: string) => {
-      const note = resolveNote(container, titleOrId);
+    .action(async (titleOrId: string) => {
+      const note = await resolveNote(container, titleOrId);
 
-      const forward = container.linkGraph.getForwardLinks(note.id);
-      const backlinks = container.linkGraph.getBacklinks(note.id);
+      const forward = await container.linkGraph.getForwardLinks(note.id);
+      const backlinks = await container.linkGraph.getBacklinks(note.id);
 
       console.log(chalk.bold.underline(note.title));
       console.log();
@@ -19,7 +19,7 @@ export function registerLinkCommand(program: Command, container: Container): voi
       if (forward.length > 0) {
         console.log(chalk.bold('Forward links:'));
         for (const link of forward) {
-          const target = container.noteRepository.getNote(link.targetNoteId);
+          const target = await container.noteRepository.getNote(link.targetNoteId);
           const title = target?.title || link.targetNoteId;
           const alias = link.alias ? chalk.dim(` (${link.alias})`) : '';
           console.log(`  ${chalk.magenta('→')} ${title}${alias}`);
@@ -33,7 +33,7 @@ export function registerLinkCommand(program: Command, container: Container): voi
       if (backlinks.length > 0) {
         console.log(chalk.bold('Backlinks:'));
         for (const link of backlinks) {
-          const source = container.noteRepository.getNote(link.sourceNoteId);
+          const source = await container.noteRepository.getNote(link.sourceNoteId);
           const title = source?.title || link.sourceNoteId;
           console.log(`  ${chalk.cyan('←')} ${title}`);
         }

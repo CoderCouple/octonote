@@ -66,6 +66,7 @@ export interface VaultConfig {
   vaultPath: string;
   storageFmt: StorageFormat;
   anthropicApiKey?: string;
+  databaseUrl?: string;
   port?: number;
   theme?: string;
 }

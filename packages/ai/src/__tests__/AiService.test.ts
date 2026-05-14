@@ -5,6 +5,8 @@ import * as path from 'path';
 import { createContainer, type Container } from '@octonote/core';
 import { AiService } from '../AiService';
 
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://localhost:5432/octonote_test';
+
 // Mock the Anthropic SDK
 vi.mock('@anthropic-ai/sdk', () => {
   const mockCreate = vi.fn();
@@ -31,21 +33,29 @@ describe('AiService', () => {
   let tmpDir: string;
   let container: Container;
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (container) await container.close();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
     vi.clearAllMocks();
   });
 
-  function setup(): Container {
+  async function setup(): Promise<Container> {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octonote-ai-svc-'));
-    container = createContainer(tmpDir);
+    container = await createContainer(TEST_DATABASE_URL, tmpDir);
+    await container.pool.query('DELETE FROM daily_notes');
+    await container.pool.query('DELETE FROM links');
+    await container.pool.query('DELETE FROM note_tags');
+    await container.pool.query('DELETE FROM blocks');
+    await container.pool.query('DELETE FROM notes');
+    await container.pool.query('DELETE FROM tags');
+    await container.pool.query('DELETE FROM folders');
     return container;
   }
 
   it('returns text response from Claude', async () => {
-    const c = setup();
+    const c = await setup();
     mockCreate.mockResolvedValueOnce({
       content: [{ type: 'text', text: 'Here is your answer.' }],
       stop_reason: 'end_turn',
@@ -59,7 +69,7 @@ describe('AiService', () => {
   });
 
   it('executes tool calls and loops back', async () => {
-    const c = setup();
+    const c = await setup();
 
     // First call: Claude wants to use a tool
     mockCreate.mockResolvedValueOnce({
@@ -94,13 +104,13 @@ describe('AiService', () => {
     expect(result.affectedNotes).toHaveLength(1);
 
     // Verify note was actually created in DB
-    const note = c.noteRepository.getNoteByTitle('AI Created');
+    const note = await c.noteRepository.getNoteByTitle('AI Created');
     expect(note).toBeDefined();
     expect(note!.blocks).toHaveLength(1);
   });
 
   it('respects max rounds', async () => {
-    const c = setup();
+    const c = await setup();
 
     // Always return tool use — should hit max rounds
     mockCreate.mockResolvedValue({
@@ -124,7 +134,7 @@ describe('AiService', () => {
   });
 
   it('handles streaming with callback', async () => {
-    const c = setup();
+    const c = await setup();
     const chunks: string[] = [];
 
     const mockStreamInstance = {
@@ -155,7 +165,7 @@ describe('AiService', () => {
   });
 
   it('resets conversation history', async () => {
-    const c = setup();
+    const c = await setup();
     mockCreate.mockResolvedValue({
       content: [{ type: 'text', text: 'Response' }],
       stop_reason: 'end_turn',

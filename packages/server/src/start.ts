@@ -10,7 +10,8 @@ const DEFAULT_PORT = 4242;
 
 export function startServer(container: Container, options: StartOptions = {}): void {
   const config = container.vaultManager.getConfig();
-  const port = options.port || config.port || DEFAULT_PORT;
+  const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
+  const port = options.port || envPort || config.port || DEFAULT_PORT;
 
   const { server } = createServer(container);
 

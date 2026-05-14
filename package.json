@@ -9,7 +9,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w packages/core && npm run build -w packages/ai && npm run build -w packages/server && npm run build -w packages/cli && npm run build -w packages/web && npm run build -w packages/desktop",
+    "build:server": "npm run build -w packages/core && npm run build -w packages/ai && npm run build -w packages/server && npm run build -w packages/web",
+    "start": "npm start --workspace @octonote/server",
     "test": "npm test --workspaces --if-present"
   }
 }

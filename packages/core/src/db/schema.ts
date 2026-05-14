@@ -1,17 +1,14 @@
-import Database from 'better-sqlite3';
+import { Pool } from 'pg';
 
-export function initDatabase(dbPath: string): Database.Database {
-  const db = new Database(dbPath);
+export async function initDatabase(connectionString: string): Promise<Pool> {
+  const pool = new Pool({ connectionString });
 
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  db.exec(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       parent_id TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (NOW()::TEXT),
       FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE SET NULL
     );
 
@@ -20,8 +17,8 @@ export function initDatabase(dbPath: string): Database.Database {
       title TEXT NOT NULL,
       folder_id TEXT,
       storage_fmt TEXT NOT NULL DEFAULT 'json',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (NOW()::TEXT),
+      updated_at TEXT NOT NULL DEFAULT (NOW()::TEXT),
       FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL
     );
 
@@ -76,5 +73,5 @@ export function initDatabase(dbPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_daily_notes_date ON daily_notes(date);
   `);
 
-  return db;
+  return pool;
 }

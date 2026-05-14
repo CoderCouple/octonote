@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as os from 'os';
-import Database from 'better-sqlite3';
+import { Pool } from 'pg';
 import { initDatabase } from './db/schema';
 import { NoteRepository } from './db/NoteRepository';
 import { BlockEngine } from './engine/BlockEngine';
@@ -10,19 +10,29 @@ import { VaultManager } from './engine/VaultManager';
 import { DailyNoteService } from './engine/DailyNoteService';
 
 export interface Container {
-  db: Database.Database;
+  pool: Pool;
   noteRepository: NoteRepository;
   blockEngine: BlockEngine;
   searchEngine: SearchEngine;
   linkGraph: LinkGraph;
   vaultManager: VaultManager;
   dailyNoteService: DailyNoteService;
+  close(): Promise<void>;
 }
 
 const DEFAULT_VAULT_PATH = path.join(os.homedir(), '.octonote');
 
-export function createContainer(vaultPath: string = DEFAULT_VAULT_PATH): Container {
-  const dbPath = path.join(vaultPath, 'octonote.db');
+export async function createContainer(
+  databaseUrl?: string,
+  vaultPath: string = DEFAULT_VAULT_PATH
+): Promise<Container> {
+  const connectionString = databaseUrl || process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      'Database connection string required. Set DATABASE_URL environment variable or pass it to createContainer().'
+    );
+  }
+
   const indexPath = path.join(vaultPath, 'search.idx');
 
   // Ensure vault dir exists
@@ -31,8 +41,8 @@ export function createContainer(vaultPath: string = DEFAULT_VAULT_PATH): Contain
     fs.mkdirSync(vaultPath, { recursive: true });
   }
 
-  const db = initDatabase(dbPath);
-  const noteRepository = new NoteRepository(db);
+  const pool = await initDatabase(connectionString);
+  const noteRepository = new NoteRepository(pool);
   const blockEngine = new BlockEngine();
   const searchEngine = new SearchEngine(indexPath);
   const linkGraph = new LinkGraph(noteRepository);
@@ -43,13 +53,16 @@ export function createContainer(vaultPath: string = DEFAULT_VAULT_PATH): Contain
   vaultManager.ensureVault();
 
   return {
-    db,
+    pool,
     noteRepository,
     blockEngine,
     searchEngine,
     linkGraph,
     vaultManager,
     dailyNoteService,
+    async close() {
+      await pool.end();
+    },
   };
 }
 

@@ -3,13 +3,13 @@ import type { Container, Note } from '@octonote/core';
 /**
  * Look up a note by ID first, then by title. Exits with error if not found.
  */
-export function resolveNote(container: Container, titleOrId: string): Note {
+export async function resolveNote(container: Container, titleOrId: string): Promise<Note> {
   // Try by ID first
-  let note = container.noteRepository.getNote(titleOrId);
+  let note = await container.noteRepository.getNote(titleOrId);
   if (note) return note;
 
   // Try by title
-  note = container.noteRepository.getNoteByTitle(titleOrId);
+  note = await container.noteRepository.getNoteByTitle(titleOrId);
   if (note) return note;
 
   console.error(`Note not found: "${titleOrId}"`);
