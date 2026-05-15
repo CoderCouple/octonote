@@ -9,6 +9,8 @@ const mockNote: Note = {
   id: 'note-1',
   title: 'Test Note',
   folderId: null,
+  projectId: null,
+  type: 'note',
   storageFmt: 'json',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-02T00:00:00Z',

@@ -1,8 +1,10 @@
 import type {
   Note,
+  NoteType,
   Block,
   Tag,
   Folder,
+  Project,
   SearchResult,
   Link,
   GraphData,
@@ -71,8 +73,8 @@ function qs(params: Record<string, string | number | undefined>): string {
 // ---------------------------------------------------------------------------
 
 const notes = {
-  /** List notes, optionally filtered by folder or tag. */
-  list(params?: { folder?: string; tag?: string }): Promise<Note[]> {
+  /** List notes, optionally filtered by folder, project, type, or tag. */
+  list(params?: { folder?: string; project?: string; type?: NoteType; tag?: string }): Promise<Note[]> {
     return fetchJson<Note[]>(`/api/notes${qs(params ?? {})}`);
   },
 
@@ -85,6 +87,8 @@ const notes = {
   create(data: {
     title: string;
     folderId?: string;
+    projectId?: string;
+    type?: NoteType;
     storageFmt?: 'json' | 'markdown';
   }): Promise<Note> {
     return fetchJson<Note>('/api/notes', {
@@ -94,7 +98,10 @@ const notes = {
   },
 
   /** Update an existing note. */
-  update(id: string, data: { title?: string; folderId?: string }): Promise<Note> {
+  update(
+    id: string,
+    data: { title?: string; folderId?: string | null; projectId?: string | null; type?: NoteType },
+  ): Promise<Note> {
     return fetchJson<Note>(`/api/notes/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -210,6 +217,44 @@ const folders = {
   },
 };
 
+const projects = {
+  /** List all projects. */
+  list(): Promise<Project[]> {
+    return fetchJson<Project[]>('/api/projects');
+  },
+
+  /** Get a project (by id or slug) with its notes. */
+  get(idOrSlug: string): Promise<Project & { notes: Note[] }> {
+    return fetchJson<Project & { notes: Note[] }>(`/api/projects/${idOrSlug}`);
+  },
+
+  /** Create a project. */
+  create(data: { name: string; slug?: string; description?: string; repo?: string }): Promise<Project> {
+    return fetchJson<Project>('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Update a project. */
+  update(
+    id: string,
+    data: { name?: string; slug?: string; description?: string | null; repo?: string | null; status?: string },
+  ): Promise<Project> {
+    return fetchJson<Project>(`/api/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Delete a project (its notes are kept, just unlinked). */
+  delete(id: string): Promise<{ deleted: true; projectId: string }> {
+    return fetchJson<{ deleted: true; projectId: string }>(`/api/projects/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 const links = {
   /** Get forward links and backlinks for a note. */
   get(noteId: string): Promise<{ forward: Link[]; backlinks: Link[] }> {
@@ -314,6 +359,7 @@ export const api = {
   search,
   tags,
   folders,
+  projects,
   links,
   graph,
   ai,

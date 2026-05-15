@@ -8,7 +8,10 @@ export type WsEvent =
   | 'note:deleted'
   | 'blocks:updated'
   | 'tags:updated'
-  | 'search:reindexed';
+  | 'search:reindexed'
+  | 'project:created'
+  | 'project:updated'
+  | 'project:deleted';
 
 export type WsHandler = (data: unknown) => void;
 

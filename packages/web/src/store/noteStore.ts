@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '@/api/client';
 import { wsClient } from '@/api/ws';
-import type { Note, Block } from '@/types';
+import type { Note, NoteType, Block } from '@/types';
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -19,8 +19,8 @@ interface NoteState {
 // ---------------------------------------------------------------------------
 
 interface NoteActions {
-  /** Fetch the note list, optionally filtered by folder / tag. */
-  fetchNotes(params?: { folder?: string; tag?: string }): Promise<void>;
+  /** Fetch the note list, optionally filtered by folder / project / type / tag. */
+  fetchNotes(params?: { folder?: string; project?: string; type?: NoteType; tag?: string }): Promise<void>;
 
   /** Fetch a single note (with blocks + tags) and set it as current. */
   fetchNote(id: string): Promise<void>;
@@ -29,11 +29,16 @@ interface NoteActions {
   createNote(data: {
     title: string;
     folderId?: string;
+    projectId?: string;
+    type?: NoteType;
     storageFmt?: 'json' | 'markdown';
   }): Promise<Note>;
 
   /** Update an existing note's metadata. */
-  updateNote(id: string, data: { title?: string; folderId?: string }): Promise<void>;
+  updateNote(
+    id: string,
+    data: { title?: string; folderId?: string | null; projectId?: string | null; type?: NoteType },
+  ): Promise<void>;
 
   /** Delete a note and remove it from the list. */
   deleteNote(id: string): Promise<void>;

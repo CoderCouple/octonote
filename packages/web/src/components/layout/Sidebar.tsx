@@ -4,10 +4,10 @@ import {
   FileText,
   Plus,
   Settings,
-  Users,
-  PenLine,
+  FolderKanban,
 } from 'lucide-react';
 import { useNoteStore } from '@/store/noteStore';
+import { useProjectStore } from '@/store/projectStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,15 +22,19 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { NavSection } from './NavSection';
+import { ProjectNav } from './ProjectNav';
 import { NavQuickLinks } from './NavQuickLinks';
+import type { Note, NoteType } from '@/types';
+
+const NOTE_TYPES: NoteType[] = [
+  'note', 'meeting', 'diagram', 'plan', 'decision', 'gotcha', 'reference', 'explanation',
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate();
@@ -39,45 +43,65 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const fetchNotes = useNoteStore((s) => s.fetchNotes);
   const createNote = useNoteStore((s) => s.createNote);
 
+  const projects = useProjectStore((s) => s.projects);
+  const fetchProjects = useProjectStore((s) => s.fetchProjects);
+  const createProject = useProjectStore((s) => s.createProject);
+  const initProjectWs = useProjectStore((s) => s.initWebSocket);
+
   const [newNoteTitle, setNewNoteTitle] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newNoteProject, setNewNoteProject] = useState('');
+  const [newNoteType, setNewNoteType] = useState<NoteType>('note');
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchNotes();
-  }, [fetchNotes]);
+    fetchProjects();
+    initProjectWs();
+  }, [fetchNotes, fetchProjects, initProjectWs]);
 
   const handleCreateNote = useCallback(async () => {
     if (!newNoteTitle.trim()) return;
-    const note = await createNote({ title: newNoteTitle.trim() });
+    const note = await createNote({
+      title: newNoteTitle.trim(),
+      projectId: newNoteProject || undefined,
+      type: newNoteType,
+    });
     setNewNoteTitle('');
-    setDialogOpen(false);
-    if (note) {
-      navigate(`/notes/${note.id}`);
-    }
-  }, [newNoteTitle, createNote, navigate]);
+    setNewNoteProject('');
+    setNewNoteType('note');
+    setNoteDialogOpen(false);
+    if (note) navigate(`/notes/${note.id}`);
+  }, [newNoteTitle, newNoteProject, newNoteType, createNote, navigate]);
 
-  // Categorize notes by tags
-  const { generalNotes, meetingNotes, diagramNotes } = useMemo(() => {
-    const meetings: typeof notes = [];
-    const diagrams: typeof notes = [];
-    const general: typeof notes = [];
+  const handleCreateProject = useCallback(async () => {
+    if (!newProjectName.trim()) return;
+    await createProject({
+      name: newProjectName.trim(),
+      description: newProjectDesc.trim() || undefined,
+    });
+    setNewProjectName('');
+    setNewProjectDesc('');
+    setProjectDialogOpen(false);
+  }, [newProjectName, newProjectDesc, createProject]);
 
+  // Group notes by project; notes with no project go to "Unassigned".
+  const { byProject, unassigned } = useMemo(() => {
+    const map = new Map<string, Note[]>();
+    const loose: Note[] = [];
     for (const note of notes) {
-      const tagNames = note.tags?.map((t) => t.name.toLowerCase()) ?? [];
-      if (tagNames.includes('meeting')) {
-        meetings.push(note);
-      } else if (tagNames.includes('diagram')) {
-        diagrams.push(note);
+      if (note.projectId) {
+        const list = map.get(note.projectId) ?? [];
+        list.push(note);
+        map.set(note.projectId, list);
       } else {
-        general.push(note);
+        loose.push(note);
       }
     }
-
-    return {
-      generalNotes: general,
-      meetingNotes: meetings,
-      diagramNotes: diagrams,
-    };
+    return { byProject: map, unassigned: loose };
   }, [notes]);
 
   return (
@@ -99,8 +123,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
+
+          {/* New Note */}
           <SidebarMenuItem>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
               <DialogTrigger asChild>
                 <SidebarMenuButton tooltip="New Note">
                   <Plus />
@@ -120,14 +146,69 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   }}
                   autoFocus
                 />
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
+                <div className="flex gap-2">
+                  <select
+                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={newNoteProject}
+                    onChange={(e) => setNewNoteProject(e.target.value)}
                   >
+                    <option value="">No project</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={newNoteType}
+                    onChange={(e) => setNewNoteType(e.target.value as NoteType)}
+                  >
+                    {NOTE_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button onClick={handleCreateNote}>Create</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </SidebarMenuItem>
+
+          {/* New Project */}
+          <SidebarMenuItem>
+            <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
+              <DialogTrigger asChild>
+                <SidebarMenuButton tooltip="New Project">
+                  <FolderKanban />
+                  <span>New Project</span>
+                </SidebarMenuButton>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Project</DialogTitle>
+                </DialogHeader>
+                <Input
+                  placeholder="Project name..."
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateProject();
+                  }}
+                  autoFocus
+                />
+                <Input
+                  placeholder="Description (optional)..."
+                  value={newProjectDesc}
+                  onChange={(e) => setNewProjectDesc(e.target.value)}
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setProjectDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateProject}>Create</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -136,26 +217,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
-            <NavSection
-              label="Notes"
-              icon={FileText}
-              notes={generalNotes}
-              defaultOpen
-            />
-            <NavSection
-              label="Meetings"
-              icon={Users}
-              notes={meetingNotes}
-            />
-            <NavSection
-              label="Diagrams"
-              icon={PenLine}
-              notes={diagramNotes}
-            />
-          </SidebarMenu>
-        </SidebarGroup>
+        {projects.map((p) => (
+          <ProjectNav
+            key={p.id}
+            label={p.name}
+            notes={byProject.get(p.id) ?? []}
+            defaultOpen
+          />
+        ))}
+        {unassigned.length > 0 && (
+          <ProjectNav label="Unassigned" notes={unassigned} />
+        )}
         <NavQuickLinks />
       </SidebarContent>
 

@@ -33,6 +33,8 @@ const fakeNote: Note = {
   id: 'note-1',
   title: 'Test Note',
   folderId: null,
+  projectId: null,
+  type: 'note',
   storageFmt: 'json',
   createdAt: '2026-03-30T00:00:00.000Z',
   updatedAt: '2026-03-30T00:00:00.000Z',
