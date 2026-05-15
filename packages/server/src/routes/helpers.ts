@@ -1,4 +1,4 @@
-import type { Container, Note, Block } from '@octonote/core';
+import type { Container, Note, Project } from '@octonote/core';
 import type { Broadcaster } from '../ws/broadcaster';
 import type { ApiError } from '../middleware/errors';
 
@@ -16,6 +16,22 @@ export async function resolveNote(container: Container, idOrTitle: string): Prom
     throw err;
   }
   return note;
+}
+
+/**
+ * Resolve a project by ID or slug. Throws 404 if not found.
+ */
+export async function resolveProject(container: Container, idOrSlug: string): Promise<Project> {
+  let project = await container.noteRepository.getProject(idOrSlug);
+  if (!project) {
+    project = await container.noteRepository.getProjectBySlug(idOrSlug);
+  }
+  if (!project) {
+    const err: ApiError = new Error(`Project not found: ${idOrSlug}`);
+    err.status = 404;
+    throw err;
+  }
+  return project;
 }
 
 /**

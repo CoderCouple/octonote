@@ -7,7 +7,10 @@ export type BroadcastEvent =
   | 'note:deleted'
   | 'blocks:updated'
   | 'tags:updated'
-  | 'search:reindexed';
+  | 'search:reindexed'
+  | 'project:created'
+  | 'project:updated'
+  | 'project:deleted';
 
 export class Broadcaster {
   private wss: WebSocketServer | null = null;

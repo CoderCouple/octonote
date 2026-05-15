@@ -7,13 +7,17 @@ export function notesRouter(container: Container, broadcaster: Broadcaster): Rou
   const router = Router();
   const { noteRepository, searchEngine } = container;
 
-  // List notes (query: ?folder=, ?tag=)
+  // List notes (query: ?folder=, ?project=, ?type=, ?tag=)
   router.get('/', async (_req, res, next) => {
     try {
       const folder = _req.query.folder as string | undefined;
+      const project = _req.query.project as string | undefined;
+      const type = _req.query.type as import('@octonote/core').NoteType | undefined;
       const tag = _req.query.tag as string | undefined;
       const notes = await noteRepository.listNotes({
         folderId: folder,
+        projectId: project,
+        type,
         tag,
       });
       res.json(notes);

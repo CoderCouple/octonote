@@ -12,6 +12,7 @@ import { searchRouter } from './routes/search';
 import { tagsRouter } from './routes/tags';
 import { linksRouter } from './routes/links';
 import { foldersRouter } from './routes/folders';
+import { projectsRouter } from './routes/projects';
 import { aiRouter } from './routes/ai';
 
 export interface ServerInstance {
@@ -34,6 +35,7 @@ export function createServer(container: Container): ServerInstance {
   app.use('/api/search', searchRouter(container));
   app.use('/api/tags', tagsRouter(container, broadcaster));
   app.use('/api/folders', foldersRouter(container));
+  app.use('/api/projects', projectsRouter(container, broadcaster));
   app.use('/api', linksRouter(container));
   app.use('/api/ai', aiRouter(container, broadcaster));
 
