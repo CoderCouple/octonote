@@ -17,7 +17,9 @@ import { Mermaid } from './extensions/Mermaid';
 import { Wikilink } from './extensions/Wikilink';
 import { GithubCard } from './extensions/GithubCard';
 import { LinkPreview } from './extensions/LinkPreview';
+import { MathBlock, MathInline } from './extensions/Math';
 import 'tippy.js/dist/tippy.css';
+import 'katex/dist/katex.min.css';
 import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
 import { blocksToMarkdown, markdownToBlocks } from '@/lib/tiptap-adapter';
@@ -66,6 +68,8 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
       Wikilink,
       GithubCard,
       LinkPreview,
+      MathBlock,
+      MathInline,
       Markdown.configure({ html: false, tightLists: true, transformPastedText: true }),
     ],
     content: blocksToMarkdown(blocks),

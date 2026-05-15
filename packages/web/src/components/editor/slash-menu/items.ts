@@ -16,6 +16,7 @@ import {
   Workflow,
   Github,
   Link as LinkIcon,
+  Sigma,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -169,6 +170,18 @@ export const SLASH_ITEMS: SlashItem[] = [
         .insertContent({ type: 'linkPreview', attrs: { url: url.trim() } })
         .run();
     },
+  },
+  {
+    title: 'Math block',
+    description: 'Display-mode KaTeX equation',
+    icon: Sigma,
+    command: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'mathBlock', attrs: { source: 'e^{i\\pi} + 1 = 0' } })
+        .run(),
   },
 ];
 
