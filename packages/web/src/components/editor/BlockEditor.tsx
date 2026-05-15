@@ -8,6 +8,7 @@ import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
 import { toTiptap, fromTiptap } from '@/lib/tiptap-adapter';
 import type { Block } from '@/types';
+import './editor.css';
 
 interface BlockEditorProps {
   blocks: Block[];
@@ -58,5 +59,5 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
     };
   }, [editor, noteId]);
 
-  return <EditorContent editor={editor} className="prose prose-sm max-w-none focus:outline-none" />;
+  return <EditorContent editor={editor} className="tiptap-editor" />;
 }
