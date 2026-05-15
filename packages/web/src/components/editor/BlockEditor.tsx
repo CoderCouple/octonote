@@ -4,9 +4,11 @@ import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Image from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
+import { Markdown } from 'tiptap-markdown';
 import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
-import { toTiptap, fromTiptap } from '@/lib/tiptap-adapter';
+import { blocksToMarkdown, markdownToBlocks } from '@/lib/tiptap-adapter';
 import type { Block } from '@/types';
 import './editor.css';
 
@@ -17,12 +19,18 @@ interface BlockEditorProps {
 
 const SAVE_DEBOUNCE_MS = 800;
 
+/** Read the markdown string back from tiptap-markdown's storage entry. */
+function getMarkdown(storage: unknown): string {
+  return (storage as { markdown: { getMarkdown(): string } }).markdown.getMarkdown();
+}
+
 /**
- * Web block editor powered by Tiptap (ProseMirror). OctoNote's flat block
- * model is translated to/from Tiptap's document JSON via `tiptap-adapter`.
+ * Web block editor powered by Tiptap + tiptap-markdown. The editor's content
+ * is a single markdown document; OctoNote's flat block model is assembled
+ * to/from that markdown via `tiptap-adapter`.
  *
- * The parent must mount with `key={noteId}` so a fresh editor is created
- * when the user switches notes.
+ * Parent must mount with `key={noteId}` so a fresh editor is created when
+ * the user switches notes.
  */
 export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
   const setDirty = useNoteStore((s) => s.setDirty);
@@ -34,15 +42,17 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
       TaskList,
       TaskItem.configure({ nested: true }),
       Image,
+      Link.configure({ openOnClick: false, autolink: true }),
+      Markdown.configure({ html: false, tightLists: true, transformPastedText: true }),
     ],
-    content: blocks.length ? toTiptap(blocks) : undefined,
+    content: blocksToMarkdown(blocks),
     onUpdate: ({ editor: ed }) => {
       setDirty(true);
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
         saveTimer.current = null;
-        const adapted = fromTiptap(ed.getJSON());
-        await api.blocks.replace(noteId, adapted);
+        const md = getMarkdown(ed.storage);
+        await api.blocks.replace(noteId, markdownToBlocks(md));
         setDirty(false);
       }, SAVE_DEBOUNCE_MS);
     },
@@ -54,7 +64,8 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
       if (saveTimer.current && editor) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
-        void api.blocks.replace(noteId, fromTiptap(editor.getJSON()));
+        const md = getMarkdown(editor.storage);
+        void api.blocks.replace(noteId, markdownToBlocks(md));
       }
     };
   }, [editor, noteId]);

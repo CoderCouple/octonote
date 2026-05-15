@@ -1,119 +1,154 @@
-import type { JSONContent } from '@tiptap/core';
+import { marked, type Tokens, type TokensList } from 'marked';
 import { BlockType } from '@/types';
 import type { Block } from '@/types';
 
 /**
- * Bidirectional adapter between OctoNote's flat block model and Tiptap's
- * ProseMirror JSON document model.
+ * Adapter between OctoNote's flat block model and a single markdown string.
  *
- * OctoNote blocks are flat (ordered by `position`); Tiptap's doc is a tree
- * with grouped lists (bulletList → listItem → paragraph). Consecutive
- * OctoNote bullet/numbered/todo blocks get grouped into one list wrapper
- * on the way in; lists get ungrouped (one block per item) on the way back.
- *
- * `content` is plain text in OctoNote — inline marks (bold/italic/links)
- * added in Tiptap are flattened on save.
- *
- * callout / embed / mermaid / table fall back to paragraphs for now.
+ * The editor uses `tiptap-markdown`, which lets Tiptap accept/emit markdown
+ * directly — so this adapter assembles a markdown document from blocks on
+ * load, and tokenizes the markdown back into blocks on save. `marked`
+ * handles the block-level tokenization; inline markdown (bold/italic/code
+ * /link) survives as plain text inside each block's `content` (matching
+ * how the CLI / core / brain hook already store it).
  */
 
 /** Block shape produced for persistence — caller supplies `id` + `noteId`. */
 export type AdaptedBlock = Pick<Block, 'type' | 'content' | 'meta' | 'position' | 'parentId'>;
 
-// ── OctoNote → Tiptap JSON ─────────────────────────────────────
+// ── OctoNote blocks → markdown ─────────────────────────────────
 
-export function toTiptap(blocks: Block[]): JSONContent {
-  const ordered = [...blocks].sort((a, b) => a.position - b.position);
-  const content: JSONContent[] = [];
-
-  let i = 0;
-  while (i < ordered.length) {
-    const b = ordered[i];
-
-    // Group consecutive list items into a single list wrapper.
-    if (b.type === BlockType.Bullet) {
-      const items: JSONContent[] = [];
-      while (i < ordered.length && ordered[i].type === BlockType.Bullet) {
-        items.push(listItem(ordered[i].content));
-        i++;
-      }
-      content.push({ type: 'bulletList', content: items });
-      continue;
-    }
-    if (b.type === BlockType.Numbered) {
-      const items: JSONContent[] = [];
-      while (i < ordered.length && ordered[i].type === BlockType.Numbered) {
-        items.push(listItem(ordered[i].content));
-        i++;
-      }
-      content.push({ type: 'orderedList', content: items });
-      continue;
-    }
-    if (b.type === BlockType.Todo) {
-      const items: JSONContent[] = [];
-      while (i < ordered.length && ordered[i].type === BlockType.Todo) {
-        const cur = ordered[i];
-        items.push(taskItem(cur.content, Boolean(cur.meta.checked)));
-        i++;
-      }
-      content.push({ type: 'taskList', content: items });
-      continue;
-    }
-
-    content.push(blockToNode(b));
-    i++;
-  }
-
-  return { type: 'doc', content };
+export function blocksToMarkdown(blocks: Block[]): string {
+  return [...blocks]
+    .sort((a, b) => a.position - b.position)
+    .map(renderBlock)
+    .join('\n\n');
 }
 
-function blockToNode(b: Block): JSONContent {
+function renderBlock(b: Block): string {
   switch (b.type) {
     case BlockType.Paragraph:
-      return paragraph(b.content);
-    case BlockType.Heading:
-      return {
-        type: 'heading',
-        attrs: { level: clampLevel(b.meta.level) },
-        ...textInline(b.content),
-      };
-    case BlockType.Code:
-      return {
-        type: 'codeBlock',
-        attrs: { language: String(b.meta.language || 'text') },
-        ...textInline(b.content),
-      };
+      return b.content;
+    case BlockType.Heading: {
+      const level = clampLevel(b.meta.level);
+      return `${'#'.repeat(level)} ${b.content}`;
+    }
+    case BlockType.Bullet:
+      return `- ${b.content}`;
+    case BlockType.Numbered:
+      return `1. ${b.content}`;
+    case BlockType.Todo: {
+      const checked = b.meta.checked ? 'x' : ' ';
+      return `- [${checked}] ${b.content}`;
+    }
+    case BlockType.Code: {
+      const lang = String(b.meta.language || '');
+      return `\`\`\`${lang}\n${b.content}\n\`\`\``;
+    }
     case BlockType.Quote:
-      return { type: 'blockquote', content: [paragraph(b.content)] };
+      return b.content
+        .split('\n')
+        .map((line) => `> ${line}`)
+        .join('\n');
     case BlockType.Divider:
-      return { type: 'horizontalRule' };
-    case BlockType.Image:
-      return {
-        type: 'image',
-        attrs: { src: b.content, alt: String(b.meta.alt || '') },
-      };
+      return '---';
+    case BlockType.Image: {
+      const alt = String(b.meta.alt || '');
+      return `![${alt}](${b.content})`;
+    }
     default:
-      // callout / embed / diagram / table — fall back for now (phase 3c)
-      return paragraph(b.content);
+      return b.content;
   }
 }
 
-function paragraph(text: string): JSONContent {
-  return { type: 'paragraph', ...textInline(text) };
+// ── Markdown → OctoNote blocks ─────────────────────────────────
+
+export function markdownToBlocks(md: string): AdaptedBlock[] {
+  const tokens = marked.lexer(md) as TokensList;
+  const result: AdaptedBlock[] = [];
+  let position = 0;
+
+  const push = (b: Omit<AdaptedBlock, 'position' | 'parentId'>) => {
+    result.push({ ...b, position: position++, parentId: null });
+  };
+
+  for (const token of tokens) {
+    handleToken(token, push);
+  }
+  return result;
 }
 
-function listItem(text: string): JSONContent {
-  return { type: 'listItem', content: [paragraph(text)] };
+type PushFn = (b: Omit<AdaptedBlock, 'position' | 'parentId'>) => void;
+
+function handleToken(t: Tokens.Generic, push: PushFn): void {
+  switch (t.type) {
+    case 'paragraph': {
+      const p = t as Tokens.Paragraph;
+      push({ type: BlockType.Paragraph, content: p.text, meta: {} });
+      return;
+    }
+    case 'heading': {
+      const h = t as Tokens.Heading;
+      push({
+        type: BlockType.Heading,
+        content: h.text,
+        meta: { level: clampLevel(h.depth) },
+      });
+      return;
+    }
+    case 'list': {
+      const list = t as Tokens.List;
+      for (const item of list.items) {
+        const text = item.text.replace(/\s+$/, '');
+        if (item.task) {
+          push({
+            type: BlockType.Todo,
+            content: stripTaskMarker(text),
+            meta: { checked: !!item.checked },
+          });
+        } else if (list.ordered) {
+          push({ type: BlockType.Numbered, content: text, meta: {} });
+        } else {
+          push({ type: BlockType.Bullet, content: text, meta: {} });
+        }
+      }
+      return;
+    }
+    case 'code': {
+      const code = t as Tokens.Code;
+      push({
+        type: BlockType.Code,
+        content: code.text,
+        meta: { language: code.lang || 'text' },
+      });
+      return;
+    }
+    case 'blockquote': {
+      const bq = t as Tokens.Blockquote;
+      push({ type: BlockType.Quote, content: bq.text.replace(/\s+$/, ''), meta: {} });
+      return;
+    }
+    case 'hr':
+      push({ type: BlockType.Divider, content: '', meta: {} });
+      return;
+    case 'space':
+    case 'def':
+      return;
+    case 'html': {
+      const html = t as Tokens.HTML;
+      if (html.text) {
+        push({ type: BlockType.Paragraph, content: html.text, meta: {} });
+      }
+      return;
+    }
+    default: {
+      const text = 'text' in t && typeof t.text === 'string' ? t.text : '';
+      if (text) push({ type: BlockType.Paragraph, content: text, meta: {} });
+    }
+  }
 }
 
-function taskItem(text: string, checked: boolean): JSONContent {
-  return { type: 'taskItem', attrs: { checked }, content: [paragraph(text)] };
-}
-
-function textInline(text: string): { content?: JSONContent[] } {
-  if (!text) return {};
-  return { content: [{ type: 'text', text }] };
-}
+// ── helpers ────────────────────────────────────────────────────
 
 function clampLevel(level: unknown): 1 | 2 | 3 {
   const n = Number(level);
@@ -122,94 +157,7 @@ function clampLevel(level: unknown): 1 | 2 | 3 {
   return 2;
 }
 
-// ── Tiptap JSON → OctoNote ─────────────────────────────────────
-
-export function fromTiptap(doc: JSONContent): AdaptedBlock[] {
-  const result: AdaptedBlock[] = [];
-  let position = 0;
-  const push = (b: Omit<AdaptedBlock, 'position' | 'parentId'>) => {
-    result.push({ ...b, position: position++, parentId: null });
-  };
-
-  for (const node of doc.content ?? []) {
-    walkTop(node, push);
-  }
-  return result;
-}
-
-type PushFn = (b: Omit<AdaptedBlock, 'position' | 'parentId'>) => void;
-
-function walkTop(node: JSONContent, push: PushFn): void {
-  const attrs = (node.attrs ?? {}) as Record<string, unknown>;
-
-  switch (node.type) {
-    case 'paragraph':
-      push({ type: BlockType.Paragraph, content: extractText(node), meta: {} });
-      return;
-    case 'heading':
-      push({
-        type: BlockType.Heading,
-        content: extractText(node),
-        meta: { level: clampLevel(attrs.level) },
-      });
-      return;
-    case 'codeBlock':
-      push({
-        type: BlockType.Code,
-        content: extractText(node),
-        meta: { language: String(attrs.language || 'text') },
-      });
-      return;
-    case 'blockquote':
-      // Emit each contained paragraph as its own quote block.
-      for (const child of node.content ?? []) {
-        push({ type: BlockType.Quote, content: extractText(child), meta: {} });
-      }
-      return;
-    case 'horizontalRule':
-      push({ type: BlockType.Divider, content: '', meta: {} });
-      return;
-    case 'image':
-      push({
-        type: BlockType.Image,
-        content: String(attrs.src || ''),
-        meta: { alt: String(attrs.alt || '') },
-      });
-      return;
-    case 'bulletList':
-      for (const li of node.content ?? []) {
-        push({ type: BlockType.Bullet, content: extractListItemText(li), meta: {} });
-      }
-      return;
-    case 'orderedList':
-      for (const li of node.content ?? []) {
-        push({ type: BlockType.Numbered, content: extractListItemText(li), meta: {} });
-      }
-      return;
-    case 'taskList':
-      for (const ti of node.content ?? []) {
-        const tiAttrs = (ti.attrs ?? {}) as Record<string, unknown>;
-        push({
-          type: BlockType.Todo,
-          content: extractListItemText(ti),
-          meta: { checked: Boolean(tiAttrs.checked) },
-        });
-      }
-      return;
-    default:
-      // Unknown node — preserve its text as a paragraph.
-      push({ type: BlockType.Paragraph, content: extractText(node), meta: {} });
-  }
-}
-
-function extractText(node: JSONContent): string {
-  if (typeof node.text === 'string') return node.text;
-  if (!node.content) return '';
-  return node.content.map(extractText).join('');
-}
-
-function extractListItemText(li: JSONContent): string {
-  // listItem / taskItem contain paragraph(s); join their texts with newlines.
-  if (!li.content) return '';
-  return li.content.map(extractText).join('\n');
+/** `marked` sometimes leaves the `[ ] ` / `[x] ` prefix in `item.text`. Strip it. */
+function stripTaskMarker(text: string): string {
+  return text.replace(/^\[[ xX]\]\s+/, '');
 }

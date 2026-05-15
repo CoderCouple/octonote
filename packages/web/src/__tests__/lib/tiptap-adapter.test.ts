@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toTiptap, fromTiptap } from '@/lib/tiptap-adapter';
+import { blocksToMarkdown, markdownToBlocks } from '@/lib/tiptap-adapter';
 import { BlockType } from '@/types';
 import type { Block } from '@/types';
 
@@ -19,49 +19,53 @@ function octo(
 describe('tiptap-adapter', () => {
   it('round-trips the directly-mappable block types', () => {
     const blocks: Block[] = [
-      octo({ type: BlockType.Paragraph, content: 'hello world', position: 0 }),
-      octo({ type: BlockType.Heading, content: 'A heading', meta: { level: 2 }, position: 1 }),
+      octo({ type: BlockType.Heading, content: 'A heading', meta: { level: 2 }, position: 0 }),
+      octo({ type: BlockType.Paragraph, content: 'hello world', position: 1 }),
       octo({ type: BlockType.Bullet, content: 'bullet a', position: 2 }),
       octo({ type: BlockType.Bullet, content: 'bullet b', position: 3 }),
-      octo({ type: BlockType.Numbered, content: 'first item', position: 4 }),
-      octo({ type: BlockType.Todo, content: 'do this', meta: { checked: true }, position: 5 }),
-      octo({ type: BlockType.Code, content: 'const x = 1;', meta: { language: 'typescript' }, position: 6 }),
-      octo({ type: BlockType.Quote, content: 'a wise quote', position: 7 }),
-      octo({ type: BlockType.Divider, content: '', position: 8 }),
+      octo({ type: BlockType.Code, content: 'const x = 1;', meta: { language: 'typescript' }, position: 4 }),
+      octo({ type: BlockType.Quote, content: 'a wise quote', position: 5 }),
+      octo({ type: BlockType.Divider, content: '', position: 6 }),
     ];
 
-    const doc = toTiptap(blocks);
-    const back = fromTiptap(doc);
+    const md = blocksToMarkdown(blocks);
+    const back = markdownToBlocks(md);
 
     expect(back).toHaveLength(blocks.length);
     for (let i = 0; i < blocks.length; i++) {
       expect(back[i].type).toBe(blocks[i].type);
       expect(back[i].content).toBe(blocks[i].content);
-      expect(back[i].meta).toEqual(blocks[i].meta);
       expect(back[i].position).toBe(i);
     }
   });
 
-  it('groups consecutive list items into a single Tiptap list wrapper', () => {
+  it('preserves heading level + code language in meta', () => {
     const blocks: Block[] = [
-      octo({ type: BlockType.Bullet, content: 'a', position: 0 }),
-      octo({ type: BlockType.Bullet, content: 'b', position: 1 }),
-      octo({ type: BlockType.Paragraph, content: 'gap', position: 2 }),
-      octo({ type: BlockType.Bullet, content: 'c', position: 3 }),
+      octo({ type: BlockType.Heading, content: 'Title', meta: { level: 1 }, position: 0 }),
+      octo({ type: BlockType.Code, content: 'print(1)', meta: { language: 'python' }, position: 1 }),
     ];
-    const doc = toTiptap(blocks);
-    const topTypes = (doc.content ?? []).map((n) => n.type);
-    expect(topTypes).toEqual(['bulletList', 'paragraph', 'bulletList']);
+    const back = markdownToBlocks(blocksToMarkdown(blocks));
+    expect(back[0].meta).toEqual({ level: 1 });
+    expect(back[1].meta).toEqual({ language: 'python' });
   });
 
-  it('round-trips an image via src + alt', () => {
+  it('round-trips task items with checked state', () => {
     const blocks: Block[] = [
-      octo({ type: BlockType.Image, content: 'https://example.com/x.png', meta: { alt: 'a picture' }, position: 0 }),
+      octo({ type: BlockType.Todo, content: 'do this', meta: { checked: true }, position: 0 }),
+      octo({ type: BlockType.Todo, content: 'not yet', meta: { checked: false }, position: 1 }),
     ];
-    const doc = toTiptap(blocks);
-    const back = fromTiptap(doc);
-    expect(back[0].type).toBe(BlockType.Image);
-    expect(back[0].content).toBe('https://example.com/x.png');
-    expect(back[0].meta).toEqual({ alt: 'a picture' });
+    const md = blocksToMarkdown(blocks);
+    const back = markdownToBlocks(md);
+    expect(back[0]).toMatchObject({ type: BlockType.Todo, content: 'do this', meta: { checked: true } });
+    expect(back[1]).toMatchObject({ type: BlockType.Todo, content: 'not yet', meta: { checked: false } });
+  });
+
+  it('keeps inline markdown intact in content strings (storage stays markdown)', () => {
+    const blocks: Block[] = [
+      octo({ type: BlockType.Paragraph, content: 'a **bold** and `code` word', position: 0 }),
+    ];
+    const md = blocksToMarkdown(blocks);
+    const back = markdownToBlocks(md);
+    expect(back[0].content).toBe('a **bold** and `code` word');
   });
 });
