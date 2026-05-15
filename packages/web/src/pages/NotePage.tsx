@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNoteStore } from '@/store/noteStore';
 import { BlockEditor } from '@/components/editor/BlockEditor';
+import { MeetingView } from '@/components/meeting/MeetingView';
 import { AiPanel } from '@/components/editor/AiPanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -190,11 +191,15 @@ export function NotePage() {
       {/* Editor area */}
       <ScrollArea className="flex-1">
         <div className="mx-auto max-w-3xl px-4 py-6">
-          <BlockEditor
-            key={currentNote.id}
-            blocks={currentNote.blocks ?? []}
-            noteId={currentNote.id}
-          />
+          {currentNote.type === 'meeting' ? (
+            <MeetingView note={currentNote} />
+          ) : (
+            <BlockEditor
+              key={currentNote.id}
+              blocks={currentNote.blocks ?? []}
+              noteId={currentNote.id}
+            />
+          )}
         </div>
 
         {/* Backlink panel */}

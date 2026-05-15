@@ -41,6 +41,8 @@ export interface Note {
   projectId: string | null;
   type: NoteType;
   storageFmt: StorageFormat;
+  /** Raw transcript text (only used by `type:meeting` notes). */
+  transcript?: string | null;
   createdAt: string;
   updatedAt: string;
   blocks?: Block[];

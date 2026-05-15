@@ -1,0 +1,184 @@
+/* ── Meeting card (Notes / Transcript tabs) ─────────────────── */
+
+.meeting-view {
+  width: 100%;
+}
+
+.meeting-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--card);
+  overflow: hidden;
+}
+
+.meeting-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.meeting-card-icon {
+  color: var(--muted-foreground);
+}
+.meeting-card-title {
+  color: var(--foreground);
+}
+
+.meeting-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.meeting-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+.meeting-tab:hover {
+  color: var(--foreground);
+  background-color: var(--accent);
+}
+.meeting-tab.is-active {
+  color: var(--foreground);
+  border-bottom-color: var(--primary);
+}
+
+.meeting-tab-panel {
+  padding: 1rem;
+}
+
+.meeting-transcript {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.meeting-transcript-empty {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+/* ── Recorder modal ─────────────────────────────────────────── */
+
+.meeting-recorder {
+  max-width: 28rem;
+}
+.meeting-recorder-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+.meeting-recorder-description {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin-top: 0.25rem;
+}
+
+.meeting-recorder-body {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.meeting-recorder-toggle {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.meeting-recorder-toggle input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+.meeting-recorder-start,
+.meeting-recorder-stop {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.meeting-recorder-timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 2rem;
+  text-align: center;
+  letter-spacing: 0.04em;
+  color: var(--foreground);
+}
+
+.meeting-recorder-meter {
+  height: 6px;
+  background-color: var(--muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.meeting-recorder-meter-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), color-mix(in oklch, var(--primary) 60%, var(--destructive)));
+  transition: width 80ms linear;
+}
+
+.meeting-recorder-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+.meeting-recorder-status .spin,
+.meeting-recorder-body .spin {
+  animation: meeting-spin 1.2s linear infinite;
+}
+@keyframes meeting-spin {
+  to { transform: rotate(360deg); }
+}
+
+.meeting-recorder-error {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.meeting-recorder-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+}
+.meeting-recorder-close:hover {
+  background-color: var(--accent);
+  color: var(--foreground);
+}

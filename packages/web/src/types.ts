@@ -42,6 +42,8 @@ export interface Note {
   folderId: string | null;
   projectId: string | null;
   type: NoteType;
+  /** Raw transcript text — only used by `type:meeting` notes. */
+  transcript?: string | null;
   storageFmt: 'json' | 'markdown';
   createdAt: string;
   updatedAt: string;

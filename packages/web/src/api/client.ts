@@ -260,6 +260,31 @@ const embed = {
   },
 };
 
+const meetings = {
+  /** Upload audio, transcribe via Whisper, summarise via Claude, return the new note. */
+  async transcribe(
+    audio: Blob,
+    opts?: { projectId?: string; title?: string; signal?: AbortSignal },
+  ): Promise<Note> {
+    const params = new URLSearchParams();
+    if (opts?.projectId) params.set('projectId', opts.projectId);
+    if (opts?.title) params.set('title', opts.title);
+    const qs = params.toString();
+    const res = await fetch(`/api/meetings/transcribe${qs ? '?' + qs : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': audio.type || 'audio/webm' },
+      body: audio,
+      signal: opts?.signal,
+    });
+    if (!res.ok) {
+      let body: unknown;
+      try { body = await res.json(); } catch { body = await res.text().catch(() => null); }
+      throw new ApiError(res.status, res.statusText, body);
+    }
+    return (await res.json()) as Note;
+  },
+};
+
 const projects = {
   /** List all projects. */
   list(): Promise<Project[]> {
@@ -404,6 +429,7 @@ export const api = {
   folders,
   projects,
   embed,
+  meetings,
   links,
   graph,
   ai,

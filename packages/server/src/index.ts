@@ -14,6 +14,7 @@ import { linksRouter } from './routes/links';
 import { foldersRouter } from './routes/folders';
 import { projectsRouter } from './routes/projects';
 import { embedRouter } from './routes/embed';
+import { meetingsRouter } from './routes/meetings';
 import { aiRouter } from './routes/ai';
 
 export interface ServerInstance {
@@ -38,6 +39,7 @@ export function createServer(container: Container): ServerInstance {
   app.use('/api/folders', foldersRouter(container));
   app.use('/api/projects', projectsRouter(container, broadcaster));
   app.use('/api/embed', embedRouter());
+  app.use('/api/meetings', meetingsRouter(container, broadcaster));
   app.use('/api', linksRouter(container));
   app.use('/api/ai', aiRouter(container, broadcaster));
 

@@ -5,7 +5,9 @@ import {
   Plus,
   Settings,
   FolderKanban,
+  Mic,
 } from 'lucide-react';
+import { MeetingRecorder } from '@/components/meeting/MeetingRecorder';
 import { useNoteStore } from '@/store/noteStore';
 import { useProjectStore } from '@/store/projectStore';
 import { Button } from '@/components/ui/button';
@@ -56,6 +58,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDesc, setNewProjectDesc] = useState('');
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+
+  const [recorderOpen, setRecorderOpen] = useState(false);
 
   useEffect(() => {
     fetchNotes();
@@ -177,6 +181,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </Dialog>
           </SidebarMenuItem>
 
+          {/* New Meeting (AI transcription) */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Start transcribing"
+              onClick={() => setRecorderOpen(true)}
+            >
+              <Mic />
+              <span>Start transcribing</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           {/* New Project */}
           <SidebarMenuItem>
             <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
@@ -243,6 +258,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarFooter>
 
       <SidebarRail />
+
+      <MeetingRecorder open={recorderOpen} onOpenChange={setRecorderOpen} />
     </Sidebar>
   );
 }

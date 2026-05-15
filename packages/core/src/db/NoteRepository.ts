@@ -28,6 +28,7 @@ export class NoteRepository {
       storageFmt?: StorageFormat;
       projectId?: string | null;
       type?: NoteType;
+      transcript?: string | null;
     }
   ): Promise<Note> {
     const id = uuidv4();
@@ -36,11 +37,12 @@ export class NoteRepository {
     const projectId = options?.projectId ?? null;
     const storageFmt = options?.storageFmt ?? 'json';
     const type = options?.type ?? 'note';
+    const transcript = options?.transcript ?? null;
     await this.pool.query(
-      'INSERT INTO notes (id, title, folder_id, project_id, type, storage_fmt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [id, title, folderId, projectId, type, storageFmt, now, now]
+      'INSERT INTO notes (id, title, folder_id, project_id, type, storage_fmt, transcript, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [id, title, folderId, projectId, type, storageFmt, transcript, now, now]
     );
-    return { id, title, folderId, projectId, type, storageFmt, createdAt: now, updatedAt: now };
+    return { id, title, folderId, projectId, type, storageFmt, transcript, createdAt: now, updatedAt: now };
   }
 
   async getNote(id: string): Promise<Note | undefined> {
@@ -61,7 +63,7 @@ export class NoteRepository {
     return note;
   }
 
-  async updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'folderId' | 'projectId' | 'type' | 'storageFmt'>>): Promise<void> {
+  async updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'folderId' | 'projectId' | 'type' | 'storageFmt' | 'transcript'>>): Promise<void> {
     const now = new Date().toISOString();
     const fields: string[] = ['updated_at = $1'];
     const values: unknown[] = [now];
@@ -72,6 +74,7 @@ export class NoteRepository {
     if (updates.projectId !== undefined) { fields.push(`project_id = $${paramIdx}`); values.push(updates.projectId); paramIdx++; }
     if (updates.type !== undefined) { fields.push(`type = $${paramIdx}`); values.push(updates.type); paramIdx++; }
     if (updates.storageFmt !== undefined) { fields.push(`storage_fmt = $${paramIdx}`); values.push(updates.storageFmt); paramIdx++; }
+    if (updates.transcript !== undefined) { fields.push(`transcript = $${paramIdx}`); values.push(updates.transcript); paramIdx++; }
 
     values.push(id);
     await this.pool.query(`UPDATE notes SET ${fields.join(', ')} WHERE id = $${paramIdx}`, values);
@@ -416,6 +419,7 @@ export class NoteRepository {
       projectId: row.project_id ?? null,
       type: (row.type ?? 'note') as NoteType,
       storageFmt: row.storage_fmt as StorageFormat,
+      transcript: row.transcript ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
