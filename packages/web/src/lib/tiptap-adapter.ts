@@ -56,6 +56,20 @@ function renderBlock(b: Block): string {
       const alt = String(b.meta.alt || '');
       return `![${alt}](${b.content})`;
     }
+    case BlockType.Callout: {
+      // GitHub-style alert + optional icon: `> [!CALLOUT 💡]` then content.
+      const icon = b.meta.icon ? String(b.meta.icon) : '';
+      const header = icon ? `[!CALLOUT ${icon}]` : `[!CALLOUT]`;
+      const lines = [`> ${header}`, ...b.content.split('\n').map((l) => `> ${l}`)];
+      return lines.join('\n');
+    }
+    case BlockType.Embed:
+      // Block-level wikilink — its own paragraph so `markdownToBlocks` recognises it.
+      return `[[${b.content}]]`;
+    case BlockType.Diagram: {
+      const kind = String(b.meta.diagramType || 'mermaid');
+      return `\`\`\`${kind}\n${b.content}\n\`\`\``;
+    }
     default:
       return b.content;
   }
@@ -84,6 +98,12 @@ function handleToken(t: Tokens.Generic, push: PushFn): void {
   switch (t.type) {
     case 'paragraph': {
       const p = t as Tokens.Paragraph;
+      // Block-level wikilink: a paragraph whose entire text is `[[Note Name]]`
+      const embedMatch = p.text.trim().match(/^\[\[([^\]\n]+)\]\]$/);
+      if (embedMatch) {
+        push({ type: BlockType.Embed, content: embedMatch[1], meta: {} });
+        return;
+      }
       push({ type: BlockType.Paragraph, content: p.text, meta: {} });
       return;
     }
@@ -116,6 +136,15 @@ function handleToken(t: Tokens.Generic, push: PushFn): void {
     }
     case 'code': {
       const code = t as Tokens.Code;
+      // Diagram code-fences (mermaid for now) → BlockType.Diagram.
+      if (code.lang === 'mermaid') {
+        push({
+          type: BlockType.Diagram,
+          content: code.text,
+          meta: { diagramType: 'mermaid' },
+        });
+        return;
+      }
       push({
         type: BlockType.Code,
         content: code.text,
@@ -125,7 +154,21 @@ function handleToken(t: Tokens.Generic, push: PushFn): void {
     }
     case 'blockquote': {
       const bq = t as Tokens.Blockquote;
-      push({ type: BlockType.Quote, content: bq.text.replace(/\s+$/, ''), meta: {} });
+      const text = bq.text.replace(/\s+$/, '');
+      // GitHub-style callout: first line is `[!CALLOUT (icon?)]`
+      const lines = text.split('\n');
+      const header = lines[0]?.match(/^\[!CALLOUT(?:\s+(.+))?\]$/);
+      if (header) {
+        const icon = (header[1] ?? '').trim();
+        const content = lines.slice(1).join('\n');
+        push({
+          type: BlockType.Callout,
+          content,
+          meta: icon ? { icon } : {},
+        });
+        return;
+      }
+      push({ type: BlockType.Quote, content: text, meta: {} });
       return;
     }
     case 'hr':

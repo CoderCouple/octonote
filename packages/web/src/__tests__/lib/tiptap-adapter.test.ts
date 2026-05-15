@@ -68,4 +68,36 @@ describe('tiptap-adapter', () => {
     const back = markdownToBlocks(md);
     expect(back[0].content).toBe('a **bold** and `code` word');
   });
+
+  it('round-trips a callout (with icon) instead of degrading to a quote', () => {
+    const blocks: Block[] = [
+      octo({ type: BlockType.Callout, content: 'heads up', meta: { icon: '💡' }, position: 0 }),
+    ];
+    const back = markdownToBlocks(blocksToMarkdown(blocks));
+    expect(back[0]).toMatchObject({
+      type: BlockType.Callout,
+      content: 'heads up',
+      meta: { icon: '💡' },
+    });
+  });
+
+  it('round-trips a block-level wikilink embed', () => {
+    const blocks: Block[] = [
+      octo({ type: BlockType.Embed, content: 'Project Plan', position: 0 }),
+    ];
+    const back = markdownToBlocks(blocksToMarkdown(blocks));
+    expect(back[0]).toMatchObject({ type: BlockType.Embed, content: 'Project Plan' });
+  });
+
+  it('round-trips a mermaid diagram (not as a generic code block)', () => {
+    const blocks: Block[] = [
+      octo({ type: BlockType.Diagram, content: 'graph TD;\n  A-->B;', meta: { diagramType: 'mermaid' }, position: 0 }),
+    ];
+    const back = markdownToBlocks(blocksToMarkdown(blocks));
+    expect(back[0]).toMatchObject({
+      type: BlockType.Diagram,
+      content: 'graph TD;\n  A-->B;',
+      meta: { diagramType: 'mermaid' },
+    });
+  });
 });
