@@ -14,6 +14,8 @@ import {
   Table,
   Lightbulb,
   Workflow,
+  Github,
+  Link as LinkIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -125,6 +127,48 @@ export const SLASH_ITEMS: SlashItem[] = [
           attrs: { source: 'graph TD;\n  A-->B;' },
         })
         .run(),
+  },
+  {
+    title: 'GitHub repo card',
+    description: 'Embed an owner/repo card with stars + language',
+    icon: Github,
+    command: ({ editor, range }) => {
+      const input = window.prompt('owner/repo or GitHub URL');
+      if (!input) return;
+      const trimmed = input.trim();
+      const m =
+        trimmed.match(/^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)/) ??
+        trimmed.match(/^([\w.-]+\/[\w.-]+)$/);
+      if (!m) {
+        window.alert('Expected `owner/repo` or `https://github.com/owner/repo`');
+        return;
+      }
+      const repo = m[1].replace(/\.git$/, '');
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'githubCard', attrs: { repo } })
+        .run();
+    },
+  },
+  {
+    title: 'Link preview',
+    description: 'Open Graph bookmark card',
+    icon: LinkIcon,
+    command: ({ editor, range }) => {
+      const url = window.prompt('URL to embed');
+      if (!url || !/^https?:\/\//.test(url.trim())) {
+        if (url) window.alert('URL must start with http:// or https://');
+        return;
+      }
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'linkPreview', attrs: { url: url.trim() } })
+        .run();
+    },
   },
 ];
 

@@ -15,6 +15,8 @@ import { SlashMenuExtension } from './slash-menu/slash-menu-extension';
 import { Callout } from './extensions/Callout';
 import { Mermaid } from './extensions/Mermaid';
 import { Wikilink } from './extensions/Wikilink';
+import { GithubCard } from './extensions/GithubCard';
+import { LinkPreview } from './extensions/LinkPreview';
 import 'tippy.js/dist/tippy.css';
 import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
@@ -62,6 +64,8 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
       Callout,
       Mermaid,
       Wikilink,
+      GithubCard,
+      LinkPreview,
       Markdown.configure({ html: false, tightLists: true, transformPastedText: true }),
     ],
     content: blocksToMarkdown(blocks),

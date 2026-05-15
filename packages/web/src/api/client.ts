@@ -220,6 +220,31 @@ const folders = {
   },
 };
 
+export interface EmbedResult {
+  url: string;
+  type: 'github' | 'link';
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+  github?: {
+    fullName: string;
+    description: string | null;
+    stars: number;
+    language: string | null;
+    forks: number;
+    homepage: string | null;
+    ownerAvatar: string | null;
+  };
+}
+
+const embed = {
+  /** Fetch Open Graph metadata (or GitHub repo data) for a URL. */
+  fetch(url: string): Promise<EmbedResult> {
+    return fetchJson<EmbedResult>(`/api/embed?url=${encodeURIComponent(url)}`);
+  },
+};
+
 const projects = {
   /** List all projects. */
   list(): Promise<Project[]> {
@@ -363,6 +388,7 @@ export const api = {
   tags,
   folders,
   projects,
+  embed,
   links,
   graph,
   ai,

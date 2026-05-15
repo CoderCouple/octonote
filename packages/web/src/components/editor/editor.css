@@ -391,6 +391,113 @@
   font-size: 0.875rem;
 }
 
+/* ── Embed cards (GitHub repo, link preview) ────────────────── */
+
+.tiptap-editor .embed-card {
+  margin: 0.75em 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--card);
+}
+.tiptap-editor .embed-card-link {
+  display: block;
+  padding: 0.75rem 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+.tiptap-editor .embed-card-link:hover {
+  background-color: color-mix(in oklch, var(--accent) 50%, transparent);
+}
+.tiptap-editor .embed-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-bottom: 0.25rem;
+}
+.tiptap-editor .embed-card-icon {
+  flex-shrink: 0;
+}
+.tiptap-editor .embed-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.tiptap-editor .embed-card-description {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+  margin: 0.25rem 0 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tiptap-editor .embed-card-loading,
+.tiptap-editor .embed-card-error {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  padding: 0.25rem 0;
+}
+.tiptap-editor .embed-card-error {
+  color: var(--destructive);
+}
+
+/* GitHub-specific */
+.tiptap-editor .github-card .embed-card-meta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.tiptap-editor .github-card .github-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.tiptap-editor .github-card .github-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.tiptap-editor .github-card .github-language::before {
+  content: '';
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background-color: var(--primary);
+}
+.tiptap-editor .github-card .github-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Link-preview image side-by-side layout */
+.tiptap-editor .link-preview .link-preview-inner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+.tiptap-editor .link-preview .link-preview-text {
+  min-width: 0;
+}
+.tiptap-editor .link-preview .link-preview-host {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.tiptap-editor .link-preview .link-preview-image {
+  width: 6rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
 /* ── Wikilink ───────────────────────────────────────────────── */
 
 .tiptap-editor .wikilink {
