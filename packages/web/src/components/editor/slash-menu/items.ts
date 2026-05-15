@@ -12,6 +12,8 @@ import {
   Minus,
   Image as ImageIcon,
   Table,
+  Lightbulb,
+  Workflow,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -101,6 +103,28 @@ export const SLASH_ITEMS: SlashItem[] = [
       if (!url) return;
       editor.chain().focus().deleteRange(range).setImage({ src: url }).run();
     },
+  },
+  {
+    title: 'Callout',
+    description: 'Highlighted info box',
+    icon: Lightbulb,
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setCallout({ icon: '💡' }).run(),
+  },
+  {
+    title: 'Mermaid diagram',
+    description: 'Live-rendered mermaid graph',
+    icon: Workflow,
+    command: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: 'mermaid',
+          attrs: { source: 'graph TD;\n  A-->B;' },
+        })
+        .run(),
   },
 ];
 

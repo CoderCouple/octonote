@@ -12,6 +12,9 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import { Markdown } from 'tiptap-markdown';
 import { SlashMenuExtension } from './slash-menu/slash-menu-extension';
+import { Callout } from './extensions/Callout';
+import { Mermaid } from './extensions/Mermaid';
+import { Wikilink } from './extensions/Wikilink';
 import 'tippy.js/dist/tippy.css';
 import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
@@ -56,6 +59,9 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
       TableCell,
       GlobalDragHandle.configure({ dragHandleWidth: 20, scrollTreshold: 100 }),
       SlashMenuExtension,
+      Callout,
+      Mermaid,
+      Wikilink,
       Markdown.configure({ html: false, tightLists: true, transformPastedText: true }),
     ],
     content: blocksToMarkdown(blocks),
