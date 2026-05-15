@@ -2,6 +2,29 @@ import { Router } from 'express';
 import * as https from 'https';
 import * as http from 'http';
 
+export type GithubRepoCard = {
+  kind: 'repo';
+  fullName: string;
+  description: string | null;
+  stars: number;
+  language: string | null;
+  forks: number;
+  homepage: string | null;
+  ownerAvatar: string | null;
+};
+
+export type GithubUserCard = {
+  kind: 'user';
+  login: string;
+  name: string | null;
+  bio: string | null;
+  publicRepos: number;
+  followers: number;
+  company: string | null;
+  blog: string | null;
+  avatar: string | null;
+};
+
 export interface EmbedResult {
   url: string;
   type: 'github' | 'link';
@@ -9,15 +32,7 @@ export interface EmbedResult {
   description?: string;
   image?: string;
   siteName?: string;
-  github?: {
-    fullName: string;
-    description: string | null;
-    stars: number;
-    language: string | null;
-    forks: number;
-    homepage: string | null;
-    ownerAvatar: string | null;
-  };
+  github?: GithubRepoCard | GithubUserCard;
 }
 
 // In-memory LRU-ish cache with TTL. Good enough for this scale.
@@ -65,11 +80,23 @@ export function embedRouter(): Router {
         return;
       }
 
-      const gh = url.match(/^https:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?$/);
-      if (gh) {
-        const result = await fetchGithubRepo(url, gh[1], gh[2]);
+      const ghRepo = url.match(/^https:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?$/);
+      if (ghRepo) {
+        const result = await fetchGithubRepo(url, ghRepo[1], ghRepo[2]);
         if (!result) {
           res.status(502).json({ error: 'could not fetch github repo' });
+          return;
+        }
+        setCached(url, result);
+        res.json(result);
+        return;
+      }
+
+      const ghUser = url.match(/^https:\/\/github\.com\/([^/?#]+)\/?$/);
+      if (ghUser) {
+        const result = await fetchGithubUser(url, ghUser[1]);
+        if (!result) {
+          res.status(502).json({ error: 'could not fetch github user' });
           return;
         }
         setCached(url, result);
@@ -113,6 +140,18 @@ interface GithubRepo {
   message?: string;
 }
 
+interface GithubUser {
+  login: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+  company: string | null;
+  blog: string | null;
+  avatar_url: string | null;
+  message?: string;
+}
+
 async function fetchGithubRepo(url: string, owner: string, repo: string): Promise<EmbedResult | null> {
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}`;
   const raw = await fetchJson(apiUrl);
@@ -126,6 +165,7 @@ async function fetchGithubRepo(url: string, owner: string, repo: string): Promis
     description: data.description ?? undefined,
     siteName: 'GitHub',
     github: {
+      kind: 'repo',
       fullName: data.full_name,
       description: data.description ?? null,
       stars: data.stargazers_count ?? 0,
@@ -133,6 +173,32 @@ async function fetchGithubRepo(url: string, owner: string, repo: string): Promis
       forks: data.forks_count ?? 0,
       homepage: data.homepage ?? null,
       ownerAvatar: data.owner?.avatar_url ?? null,
+    },
+  };
+}
+
+async function fetchGithubUser(url: string, login: string): Promise<EmbedResult | null> {
+  const apiUrl = `https://api.github.com/users/${login}`;
+  const raw = await fetchJson(apiUrl);
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as unknown as GithubUser;
+  if (data.message) return null;
+  return {
+    url,
+    type: 'github',
+    title: data.name ?? data.login,
+    description: data.bio ?? undefined,
+    siteName: 'GitHub',
+    github: {
+      kind: 'user',
+      login: data.login,
+      name: data.name ?? null,
+      bio: data.bio ?? null,
+      publicRepos: data.public_repos ?? 0,
+      followers: data.followers ?? 0,
+      company: data.company ?? null,
+      blog: data.blog ?? null,
+      avatar: data.avatar_url ?? null,
     },
   };
 }

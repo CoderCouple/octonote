@@ -220,6 +220,29 @@ const folders = {
   },
 };
 
+export type GithubRepoCard = {
+  kind: 'repo';
+  fullName: string;
+  description: string | null;
+  stars: number;
+  language: string | null;
+  forks: number;
+  homepage: string | null;
+  ownerAvatar: string | null;
+};
+
+export type GithubUserCard = {
+  kind: 'user';
+  login: string;
+  name: string | null;
+  bio: string | null;
+  publicRepos: number;
+  followers: number;
+  company: string | null;
+  blog: string | null;
+  avatar: string | null;
+};
+
 export interface EmbedResult {
   url: string;
   type: 'github' | 'link';
@@ -227,15 +250,7 @@ export interface EmbedResult {
   description?: string;
   image?: string;
   siteName?: string;
-  github?: {
-    fullName: string;
-    description: string | null;
-    stars: number;
-    language: string | null;
-    forks: number;
-    homepage: string | null;
-    ownerAvatar: string | null;
-  };
+  github?: GithubRepoCard | GithubUserCard;
 }
 
 const embed = {

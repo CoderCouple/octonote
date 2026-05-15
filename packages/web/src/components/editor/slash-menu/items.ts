@@ -130,26 +130,27 @@ export const SLASH_ITEMS: SlashItem[] = [
         .run(),
   },
   {
-    title: 'GitHub repo card',
-    description: 'Embed an owner/repo card with stars + language',
+    title: 'GitHub card',
+    description: 'Embed a repo (owner/repo) or user (owner)',
     icon: Github,
     command: ({ editor, range }) => {
-      const input = window.prompt('owner/repo or GitHub URL');
+      const input = window.prompt('GitHub URL, owner, or owner/repo');
       if (!input) return;
       const trimmed = input.trim();
+      // Accept full URL (with or without /repo), or shorthand.
       const m =
-        trimmed.match(/^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)/) ??
-        trimmed.match(/^([\w.-]+\/[\w.-]+)$/);
+        trimmed.match(/^https?:\/\/github\.com\/([\w.-]+(?:\/[\w.-]+)?)\/?$/) ??
+        trimmed.match(/^([\w.-]+(?:\/[\w.-]+)?)$/);
       if (!m) {
-        window.alert('Expected `owner/repo` or `https://github.com/owner/repo`');
+        window.alert('Expected `owner`, `owner/repo`, or `https://github.com/...`');
         return;
       }
-      const repo = m[1].replace(/\.git$/, '');
+      const target = m[1].replace(/\.git$/, '');
       editor
         .chain()
         .focus()
         .deleteRange(range)
-        .insertContent({ type: 'githubCard', attrs: { repo } })
+        .insertContent({ type: 'githubCard', attrs: { target } })
         .run();
     },
   },
