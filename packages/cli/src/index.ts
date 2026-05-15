@@ -20,6 +20,7 @@ import { registerEditCommand } from './commands/edit.js';
 import { registerAiCommand } from './commands/ai.js';
 import { registerServeCommand } from './commands/serve.js';
 import { registerBrainCommand } from './commands/brain.js';
+import { registerProjectCommand } from './commands/project.js';
 
 const DEFAULT_VAULT_PATH = path.join(os.homedir(), '.octonote');
 
@@ -85,6 +86,7 @@ async function main() {
   registerConfigCommand(program, container.vaultManager);
   registerExportCommand(program, container);
   registerImportCommand(program, container);
+  registerProjectCommand(program, container);
 
   // TUI commands
   registerNewCommand(program, container);

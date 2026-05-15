@@ -62,7 +62,7 @@ describe('NoteRepository', () => {
 
   it('lists notes with folder filter', async () => {
     const folder = await repo.createFolder('MyFolder');
-    await repo.createNote('In folder', folder.id);
+    await repo.createNote('In folder', { folderId: folder.id });
     await repo.createNote('No folder');
 
     const all = await repo.listNotes();

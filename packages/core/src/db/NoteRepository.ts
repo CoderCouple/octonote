@@ -2,8 +2,10 @@ import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Note,
+  NoteType,
   Block,
   Folder,
+  Project,
   Tag,
   Link,
   DailyNote,
@@ -19,14 +21,26 @@ export class NoteRepository {
 
   // ── Notes ──────────────────────────────────────────────
 
-  async createNote(title: string, folderId?: string | null, storageFmt: StorageFormat = 'json'): Promise<Note> {
+  async createNote(
+    title: string,
+    options?: {
+      folderId?: string | null;
+      storageFmt?: StorageFormat;
+      projectId?: string | null;
+      type?: NoteType;
+    }
+  ): Promise<Note> {
     const id = uuidv4();
     const now = new Date().toISOString();
+    const folderId = options?.folderId ?? null;
+    const projectId = options?.projectId ?? null;
+    const storageFmt = options?.storageFmt ?? 'json';
+    const type = options?.type ?? 'note';
     await this.pool.query(
-      'INSERT INTO notes (id, title, folder_id, storage_fmt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, title, folderId ?? null, storageFmt, now, now]
+      'INSERT INTO notes (id, title, folder_id, project_id, type, storage_fmt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, title, folderId, projectId, type, storageFmt, now, now]
     );
-    return { id, title, folderId: folderId ?? null, storageFmt, createdAt: now, updatedAt: now };
+    return { id, title, folderId, projectId, type, storageFmt, createdAt: now, updatedAt: now };
   }
 
   async getNote(id: string): Promise<Note | undefined> {
@@ -47,7 +61,7 @@ export class NoteRepository {
     return note;
   }
 
-  async updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'folderId' | 'storageFmt'>>): Promise<void> {
+  async updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'folderId' | 'projectId' | 'type' | 'storageFmt'>>): Promise<void> {
     const now = new Date().toISOString();
     const fields: string[] = ['updated_at = $1'];
     const values: unknown[] = [now];
@@ -55,6 +69,8 @@ export class NoteRepository {
 
     if (updates.title !== undefined) { fields.push(`title = $${paramIdx}`); values.push(updates.title); paramIdx++; }
     if (updates.folderId !== undefined) { fields.push(`folder_id = $${paramIdx}`); values.push(updates.folderId); paramIdx++; }
+    if (updates.projectId !== undefined) { fields.push(`project_id = $${paramIdx}`); values.push(updates.projectId); paramIdx++; }
+    if (updates.type !== undefined) { fields.push(`type = $${paramIdx}`); values.push(updates.type); paramIdx++; }
     if (updates.storageFmt !== undefined) { fields.push(`storage_fmt = $${paramIdx}`); values.push(updates.storageFmt); paramIdx++; }
 
     values.push(id);
@@ -65,27 +81,35 @@ export class NoteRepository {
     await this.pool.query('DELETE FROM notes WHERE id = $1', [id]);
   }
 
-  async listNotes(options?: { folderId?: string; tag?: string }): Promise<Note[]> {
+  async listNotes(options?: { folderId?: string; projectId?: string; type?: NoteType; tag?: string }): Promise<Note[]> {
     let sql = 'SELECT DISTINCT n.* FROM notes n';
     const params: unknown[] = [];
+    const where: string[] = [];
     let paramIdx = 1;
 
     if (options?.tag) {
       sql += ' JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.id';
-      sql += ` WHERE t.name = $${paramIdx}`;
+      where.push(`t.name = $${paramIdx}`);
       params.push(options.tag);
       paramIdx++;
-      if (options.folderId) {
-        sql += ` AND n.folder_id = $${paramIdx}`;
-        params.push(options.folderId);
-        paramIdx++;
-      }
-    } else if (options?.folderId) {
-      sql += ` WHERE n.folder_id = $${paramIdx}`;
+    }
+    if (options?.folderId) {
+      where.push(`n.folder_id = $${paramIdx}`);
       params.push(options.folderId);
       paramIdx++;
     }
+    if (options?.projectId) {
+      where.push(`n.project_id = $${paramIdx}`);
+      params.push(options.projectId);
+      paramIdx++;
+    }
+    if (options?.type) {
+      where.push(`n.type = $${paramIdx}`);
+      params.push(options.type);
+      paramIdx++;
+    }
 
+    if (where.length > 0) sql += ` WHERE ${where.join(' AND ')}`;
     sql += ' ORDER BY n.updated_at DESC';
     const { rows } = await this.pool.query(sql, params);
     return rows.map((r: any) => this.mapNote(r));
@@ -190,6 +214,76 @@ export class NoteRepository {
 
   async deleteFolder(id: string): Promise<void> {
     await this.pool.query('DELETE FROM folders WHERE id = $1', [id]);
+  }
+
+  // ── Projects ───────────────────────────────────────────
+
+  async createProject(
+    name: string,
+    options?: { slug?: string; description?: string | null; repo?: string | null; status?: string }
+  ): Promise<Project> {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    const slug = options?.slug ?? slugify(name);
+    const description = options?.description ?? null;
+    const repo = options?.repo ?? null;
+    const status = options?.status ?? 'active';
+    await this.pool.query(
+      'INSERT INTO projects (id, name, slug, description, repo, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, name, slug, description, repo, status, now, now]
+    );
+    return { id, name, slug, description, repo, status, createdAt: now, updatedAt: now };
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+    return rows.length > 0 ? this.mapProject(rows[0]) : undefined;
+  }
+
+  async getProjectBySlug(slug: string): Promise<Project | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM projects WHERE slug = $1', [slug]);
+    return rows.length > 0 ? this.mapProject(rows[0]) : undefined;
+  }
+
+  async getProjectByRepo(repo: string): Promise<Project | undefined> {
+    const { rows } = await this.pool.query('SELECT * FROM projects WHERE repo = $1', [repo]);
+    return rows.length > 0 ? this.mapProject(rows[0]) : undefined;
+  }
+
+  async listProjects(): Promise<Project[]> {
+    const { rows } = await this.pool.query('SELECT * FROM projects ORDER BY name');
+    return rows.map((r: any) => this.mapProject(r));
+  }
+
+  async updateProject(
+    id: string,
+    updates: Partial<Pick<Project, 'name' | 'slug' | 'description' | 'repo' | 'status'>>
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const fields: string[] = ['updated_at = $1'];
+    const values: unknown[] = [now];
+    let paramIdx = 2;
+
+    if (updates.name !== undefined) { fields.push(`name = $${paramIdx}`); values.push(updates.name); paramIdx++; }
+    if (updates.slug !== undefined) { fields.push(`slug = $${paramIdx}`); values.push(updates.slug); paramIdx++; }
+    if (updates.description !== undefined) { fields.push(`description = $${paramIdx}`); values.push(updates.description); paramIdx++; }
+    if (updates.repo !== undefined) { fields.push(`repo = $${paramIdx}`); values.push(updates.repo); paramIdx++; }
+    if (updates.status !== undefined) { fields.push(`status = $${paramIdx}`); values.push(updates.status); paramIdx++; }
+
+    values.push(id);
+    await this.pool.query(`UPDATE projects SET ${fields.join(', ')} WHERE id = $${paramIdx}`, values);
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM projects WHERE id = $1', [id]);
+  }
+
+  /** Get an existing project by its git repo slug, or create one if absent. */
+  async ensureProject(repo: string): Promise<Project> {
+    const existing = await this.getProjectByRepo(repo);
+    if (existing) return existing;
+    const name = repo.split('/').pop() || repo;
+    return this.createProject(name, { slug: slugify(repo), repo });
   }
 
   // ── Tags ───────────────────────────────────────────────
@@ -319,7 +413,22 @@ export class NoteRepository {
       id: row.id,
       title: row.title,
       folderId: row.folder_id,
+      projectId: row.project_id ?? null,
+      type: (row.type ?? 'note') as NoteType,
       storageFmt: row.storage_fmt as StorageFormat,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private mapProject(row: any): Project {
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description ?? null,
+      repo: row.repo ?? null,
+      status: row.status,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -355,4 +464,12 @@ export class NoteRepository {
       alias: row.alias,
     };
   }
+}
+
+/** Lowercase, hyphenated, url-safe slug (e.g. `CoderCouple/octonote` → `codercouple-octonote`). */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }

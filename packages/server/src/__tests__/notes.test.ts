@@ -111,7 +111,7 @@ describe('Notes API', () => {
 
   it('GET /api/notes?folder= filters by folder', async () => {
     const folder = await container.noteRepository.createFolder('Projects');
-    await container.noteRepository.createNote('In Folder', folder.id);
+    await container.noteRepository.createNote('In Folder', { folderId: folder.id });
     await container.noteRepository.createNote('No Folder');
 
     const res = await request(app).get(`/api/notes?folder=${folder.id}`);

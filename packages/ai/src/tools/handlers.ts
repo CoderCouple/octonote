@@ -33,7 +33,7 @@ export async function handleCreateNote(
   input: { title: string; blocks: BlockInput[]; tags?: string[]; folderId?: string }
 ): Promise<ToolResult> {
   try {
-    const note = await container.noteRepository.createNote(input.title, input.folderId);
+    const note = await container.noteRepository.createNote(input.title, { folderId: input.folderId });
 
     // Create blocks
     for (let i = 0; i < input.blocks.length; i++) {

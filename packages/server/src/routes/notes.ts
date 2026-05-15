@@ -31,12 +31,12 @@ export function notesRouter(container: Container, broadcaster: Broadcaster): Rou
   // Create note
   router.post('/', async (req, res, next) => {
     try {
-      const { title, folderId, storageFmt } = req.body;
+      const { title, folderId, projectId, type, storageFmt } = req.body;
       if (!title) {
         res.status(400).json({ error: 'title is required', status: 400 });
         return;
       }
-      const note = await noteRepository.createNote(title, folderId, storageFmt);
+      const note = await noteRepository.createNote(title, { folderId, projectId, type, storageFmt });
       await fullSave(container, note.id, broadcaster);
       broadcaster.broadcast('note:created', { noteId: note.id, title: note.title });
       res.status(201).json(await noteRepository.getNote(note.id));
@@ -47,8 +47,8 @@ export function notesRouter(container: Container, broadcaster: Broadcaster): Rou
   router.patch('/:id', async (req, res, next) => {
     try {
       const note = await resolveNote(container, req.params.id);
-      const { title, folderId } = req.body;
-      await noteRepository.updateNote(note.id, { title, folderId });
+      const { title, folderId, projectId, type } = req.body;
+      await noteRepository.updateNote(note.id, { title, folderId, projectId, type });
       await fullSave(container, note.id, broadcaster);
       res.json(await noteRepository.getNote(note.id));
     } catch (err) { next(err); }

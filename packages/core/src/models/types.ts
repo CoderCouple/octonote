@@ -24,10 +24,22 @@ export interface Block {
   parentId: string | null;
 }
 
+export type NoteType =
+  | 'note'
+  | 'meeting'
+  | 'diagram'
+  | 'plan'
+  | 'decision'
+  | 'gotcha'
+  | 'reference'
+  | 'explanation';
+
 export interface Note {
   id: string;
   title: string;
   folderId: string | null;
+  projectId: string | null;
+  type: NoteType;
   storageFmt: StorageFormat;
   createdAt: string;
   updatedAt: string;
@@ -40,6 +52,17 @@ export interface Folder {
   name: string;
   parentId: string | null;
   createdAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  repo: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Tag {

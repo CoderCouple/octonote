@@ -16,7 +16,7 @@ export function registerImportCommand(program: Command, container: Container): v
       const folderId = opts.folder || partial.folderId || null;
       const fmt = partial.storageFmt || 'json';
 
-      const note = await noteRepository.createNote(title, folderId, fmt);
+      const note = await noteRepository.createNote(title, { folderId, storageFmt: fmt });
 
       // Create blocks in DB
       for (const block of blocks) {

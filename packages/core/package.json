@@ -5,7 +5,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate": "node-pg-migrate -m migrations -j sql",
+    "migrate:create": "node-pg-migrate create -m migrations -j sql"
   },
   "dependencies": {
     "@types/pg": "^8.20.0",
@@ -14,6 +16,7 @@
     "gray-matter": "^4.0.3",
     "marked": "^15.0.0",
     "minisearch": "^7.1.0",
+    "node-pg-migrate": "^8.0.4",
     "pg": "^8.20.0",
     "uuid": "^11.1.0"
   },
