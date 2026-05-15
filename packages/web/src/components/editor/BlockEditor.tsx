@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
-import { BlockNoteView } from '@blocknote/shadcn';
+import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/core/fonts/inter.css';
-import '@blocknote/shadcn/style.css';
+import '@blocknote/mantine/style.css';
 import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
 import { toBlockNote, fromBlockNote } from '@/lib/blocknote-adapter';
