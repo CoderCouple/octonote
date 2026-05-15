@@ -191,6 +191,7 @@ export function NotePage() {
       <ScrollArea className="flex-1">
         <div className="mx-auto max-w-3xl px-4 py-6">
           <BlockEditor
+            key={currentNote.id}
             blocks={currentNote.blocks ?? []}
             noteId={currentNote.id}
           />

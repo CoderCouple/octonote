@@ -226,7 +226,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           />
         ))}
         {unassigned.length > 0 && (
-          <ProjectNav label="Unassigned" notes={unassigned} />
+          <ProjectNav label="Unassigned" notes={unassigned} defaultOpen />
         )}
         <NavQuickLinks />
       </SidebarContent>

@@ -116,9 +116,12 @@ const notes = {
   },
 };
 
+/** The server only reads type/content/meta when (re)creating blocks. */
+type BlockInput = Pick<Block, 'type' | 'content' | 'meta'>;
+
 const blocks = {
   /** Append blocks to a note. */
-  append(noteId: string, blockList: Block[]): Promise<Block[]> {
+  append(noteId: string, blockList: BlockInput[]): Promise<Block[]> {
     return fetchJson<Block[]>(`/api/notes/${noteId}/blocks`, {
       method: 'POST',
       body: JSON.stringify({ blocks: blockList }),
@@ -126,7 +129,7 @@ const blocks = {
   },
 
   /** Replace all blocks on a note. */
-  replace(noteId: string, blockList: Block[]): Promise<Block[]> {
+  replace(noteId: string, blockList: BlockInput[]): Promise<Block[]> {
     return fetchJson<Block[]>(`/api/notes/${noteId}/blocks`, {
       method: 'PUT',
       body: JSON.stringify({ blocks: blockList }),

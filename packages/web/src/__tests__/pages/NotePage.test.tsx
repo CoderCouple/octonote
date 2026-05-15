@@ -62,6 +62,17 @@ vi.mock('@/api/ws', () => ({
   wsClient: { connect: vi.fn(), on: vi.fn(), off: vi.fn(), disconnect: vi.fn() },
 }));
 
+// BlockNote can't render in jsdom — stub the editor with a plain block list.
+vi.mock('@/components/editor/BlockEditor', () => ({
+  BlockEditor: ({ blocks }: { blocks: Array<{ id: string; content: string }> }) => (
+    <div data-testid="block-editor">
+      {blocks.map((b) => (
+        <div key={b.id}>{b.content}</div>
+      ))}
+    </div>
+  ),
+}));
+
 function renderNotePage() {
   return render(
     <MemoryRouter initialEntries={['/notes/note-1']}>

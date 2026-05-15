@@ -56,6 +56,16 @@ vi.mock('@/store/uiStore', () => ({
     }),
 }));
 
+vi.mock('@/store/projectStore', () => ({
+  useProjectStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      projects: [],
+      fetchProjects: vi.fn(),
+      createProject: vi.fn(),
+      initWebSocket: vi.fn(),
+    }),
+}));
+
 function renderSidebar() {
   return render(
     <MemoryRouter>
