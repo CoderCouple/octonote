@@ -5,7 +5,14 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
+import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import { Markdown } from 'tiptap-markdown';
+import { SlashMenuExtension } from './slash-menu/slash-menu-extension';
+import 'tippy.js/dist/tippy.css';
 import { api } from '@/api/client';
 import { useNoteStore } from '@/store/noteStore';
 import { blocksToMarkdown, markdownToBlocks } from '@/lib/tiptap-adapter';
@@ -43,6 +50,12 @@ export function BlockEditor({ blocks, noteId }: BlockEditorProps) {
       TaskItem.configure({ nested: true }),
       Image,
       Link.configure({ openOnClick: false, autolink: true }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      GlobalDragHandle.configure({ dragHandleWidth: 20, scrollTreshold: 100 }),
+      SlashMenuExtension,
       Markdown.configure({ html: false, tightLists: true, transformPastedText: true }),
     ],
     content: blocksToMarkdown(blocks),
