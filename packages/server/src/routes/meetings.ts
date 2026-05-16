@@ -41,8 +41,11 @@ export function meetingsRouter(container: Container, broadcaster: Broadcaster): 
           return;
         }
 
-        const contentType = (req.headers['content-type'] || 'audio/webm').toString().split(';')[0];
+        // Strip parameters like `;codecs=opus` — Whisper / ElevenLabs match
+        // on the bare MIME and the codec hint can confuse the file detector.
+        const contentType = (req.headers['content-type'] || 'audio/webm').toString().split(';')[0].trim();
         const ext = audioExt(contentType);
+        console.log(`[meetings] received audio: ${audio.length} bytes, type=${contentType}, ext=${ext}`);
         const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
         const titleOverride = typeof req.query.title === 'string' ? req.query.title : undefined;
 
@@ -115,7 +118,7 @@ async function transcribeWithElevenLabs(
   apiKey: string,
 ): Promise<string | null> {
   const form = new FormData();
-  form.append('file', new Blob([new Uint8Array(audio)], { type: contentType }), `audio.${ext}`);
+  form.append('file', new Blob([bufferToArrayBuffer(audio)], { type: contentType }), `audio.${ext}`);
   form.append('model_id', 'scribe_v1');
   form.append('diarize', 'true');
   form.append('tag_audio_events', 'false');
@@ -141,7 +144,7 @@ async function transcribeWithWhisper(
   apiKey: string,
 ): Promise<string | null> {
   const form = new FormData();
-  form.append('file', new Blob([new Uint8Array(audio)], { type: contentType }), `audio.${ext}`);
+  form.append('file', new Blob([bufferToArrayBuffer(audio)], { type: contentType }), `audio.${ext}`);
   form.append('model', 'whisper-1');
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -235,6 +238,13 @@ async function summariseWithClaude(transcript: string, container: Container): Pr
 }
 
 // ── helpers ────────────────────────────────────────────────────
+
+/** Copy a Node Buffer into a fresh ArrayBuffer with exactly its bytes —
+ *  Node Buffers are views into a pooled allocator, so passing them straight
+ *  into Blob() can include garbage past the intended range. */
+function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
 
 function audioExt(contentType: string): string {
   if (contentType.includes('mp4')) return 'mp4';
