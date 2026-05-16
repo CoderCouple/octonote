@@ -14,6 +14,10 @@ interface MeetingRecorderProps {
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'uploading' | 'transcribing' | 'error';
 
+/** True when running inside the OctoNote Desktop (Electron) app. */
+const IS_DESKTOP =
+  typeof window !== 'undefined' && Boolean((window as { octonoteDesktop?: unknown }).octonoteDesktop);
+
 /**
  * Modal recorder. Captures the mic + (optionally) the user's tab audio, mixes
  * them via Web Audio, and uploads the recorded blob to /api/meetings/transcribe.
@@ -194,7 +198,11 @@ export function MeetingRecorder({ open, onOpenChange, projectId }: MeetingRecord
                   checked={captureTab}
                   onChange={(e) => setCaptureTab(e.target.checked)}
                 />
-                <span>Also capture audio from a browser tab (Zoom Web / Google Meet / etc.)</span>
+                <span>
+                  {IS_DESKTOP
+                    ? 'Also capture system audio (Zoom / Teams / Slack huddle / any app)'
+                    : 'Also capture audio from a browser tab (Zoom Web / Google Meet / etc.)'}
+                </span>
               </label>
               {error && <div className="meeting-recorder-error">{error}</div>}
               <Button onClick={startRecording} className="meeting-recorder-start">
