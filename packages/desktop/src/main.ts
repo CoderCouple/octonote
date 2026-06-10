@@ -14,19 +14,30 @@ async function bootstrap(): Promise<void> {
   // Resolve dev vs production paths
   const paths = resolveAppPaths();
 
-  // Point server at the correct web dist directory
-  process.env.OCTONOTE_WEB_DIST = paths.webDist;
+  // When OCTONOTE_REMOTE_URL is set, point the window at the hosted server
+  // (web bundle + API both come from there) and skip the local Express bootstrap.
+  const remoteUrl = process.env.OCTONOTE_REMOTE_URL;
+  let loadTarget: string;
 
-  // Bootstrap core container
-  const container = await createContainer();
+  if (remoteUrl) {
+    loadTarget = remoteUrl;
+  } else {
+    // Point server at the correct web dist directory
+    process.env.OCTONOTE_WEB_DIST = paths.webDist;
 
-  // Start Express server on a free port (or 4242 in dev)
-  const port = paths.isDev ? 4242 : await findFreePort();
-  const { server } = createServer(container);
+    // Bootstrap core container
+    const container = await createContainer();
 
-  await new Promise<void>((resolve) => {
-    server.listen(port, '127.0.0.1', () => resolve());
-  });
+    // Start Express server on a free port (or 4242 in dev)
+    const port = paths.isDev ? 4242 : await findFreePort();
+    const { server } = createServer(container);
+
+    await new Promise<void>((resolve) => {
+      server.listen(port, '127.0.0.1', () => resolve());
+    });
+
+    loadTarget = paths.loadUrl(port);
+  }
 
   // Set up native chrome
   registerIpcHandlers();
@@ -65,7 +76,7 @@ async function bootstrap(): Promise<void> {
     },
   });
 
-  await mainWindow.loadURL(paths.loadUrl(port));
+  await mainWindow.loadURL(loadTarget);
 
   createTray(mainWindow);
 
