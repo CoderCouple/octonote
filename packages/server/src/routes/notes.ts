@@ -51,8 +51,8 @@ export function notesRouter(container: Container, broadcaster: Broadcaster): Rou
   router.patch('/:id', async (req, res, next) => {
     try {
       const note = await resolveNote(container, req.params.id);
-      const { title, folderId, projectId, type } = req.body;
-      await noteRepository.updateNote(note.id, { title, folderId, projectId, type });
+      const { title, folderId, projectId, type, drawing } = req.body;
+      await noteRepository.updateNote(note.id, { title, folderId, projectId, type, drawing });
       await fullSave(container, note.id, broadcaster);
       res.json(await noteRepository.getNote(note.id));
     } catch (err) { next(err); }

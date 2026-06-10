@@ -44,6 +44,8 @@ export interface Note {
   type: NoteType;
   /** Raw transcript text — only used by `type:meeting` notes. */
   transcript?: string | null;
+  /** tldraw snapshot — only used by `type:diagram` notes. */
+  drawing?: Record<string, unknown> | null;
   storageFmt: 'json' | 'markdown';
   createdAt: string;
   updatedAt: string;

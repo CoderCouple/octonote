@@ -43,6 +43,8 @@ export interface Note {
   storageFmt: StorageFormat;
   /** Raw transcript text (only used by `type:meeting` notes). */
   transcript?: string | null;
+  /** tldraw snapshot (only used by `type:diagram` notes). */
+  drawing?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
   blocks?: Block[];

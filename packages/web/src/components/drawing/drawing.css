@@ -1,0 +1,8 @@
+.drawing-view {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 110px);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+}

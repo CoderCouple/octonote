@@ -37,7 +37,13 @@ interface NoteActions {
   /** Update an existing note's metadata. */
   updateNote(
     id: string,
-    data: { title?: string; folderId?: string | null; projectId?: string | null; type?: NoteType },
+    data: {
+      title?: string;
+      folderId?: string | null;
+      projectId?: string | null;
+      type?: NoteType;
+      drawing?: Record<string, unknown> | null;
+    },
   ): Promise<void>;
 
   /** Delete a note and remove it from the list. */

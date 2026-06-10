@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNoteStore } from '@/store/noteStore';
 import { BlockEditor } from '@/components/editor/BlockEditor';
 import { MeetingView } from '@/components/meeting/MeetingView';
+
+// Lazy-load tldraw — it's ~1MB and only used by diagram-type notes.
+const DrawingView = lazy(() =>
+  import('@/components/drawing/DrawingView').then((m) => ({ default: m.DrawingView })),
+);
 import { AiPanel } from '@/components/editor/AiPanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -190,17 +195,26 @@ export function NotePage() {
 
       {/* Editor area */}
       <ScrollArea className="flex-1">
-        <div className="mx-auto max-w-3xl px-4 py-6">
-          {currentNote.type === 'meeting' ? (
-            <MeetingView note={currentNote} />
-          ) : (
-            <BlockEditor
-              key={currentNote.id}
-              blocks={currentNote.blocks ?? []}
-              noteId={currentNote.id}
-            />
-          )}
-        </div>
+        {currentNote.type === 'diagram' ? (
+          // Drawings fill the full pane — no max-width constraint.
+          <div className="px-4 py-6">
+            <Suspense fallback={<Skeleton className="h-[60vh] w-full" />}>
+              <DrawingView key={currentNote.id} note={currentNote} />
+            </Suspense>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-3xl px-4 py-6">
+            {currentNote.type === 'meeting' ? (
+              <MeetingView note={currentNote} />
+            ) : (
+              <BlockEditor
+                key={currentNote.id}
+                blocks={currentNote.blocks ?? []}
+                noteId={currentNote.id}
+              />
+            )}
+          </div>
+        )}
 
         {/* Backlink panel */}
         <div className="mx-auto max-w-3xl px-4 pb-6">

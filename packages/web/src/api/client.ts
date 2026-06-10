@@ -100,7 +100,13 @@ const notes = {
   /** Update an existing note. */
   update(
     id: string,
-    data: { title?: string; folderId?: string | null; projectId?: string | null; type?: NoteType },
+    data: {
+      title?: string;
+      folderId?: string | null;
+      projectId?: string | null;
+      type?: NoteType;
+      drawing?: Record<string, unknown> | null;
+    },
   ): Promise<Note> {
     return fetchJson<Note>(`/api/notes/${id}`, {
       method: 'PATCH',
