@@ -12,10 +12,14 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:4242',
+      '/api': {
+        target: process.env.VITE_API_TARGET || 'http://localhost:4242',
+        changeOrigin: true,
+      },
       '/ws': {
-        target: 'ws://localhost:4242',
+        target: process.env.VITE_WS_TARGET || 'ws://localhost:4242',
         ws: true,
+        changeOrigin: true,
       },
     },
   },

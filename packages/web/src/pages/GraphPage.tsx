@@ -65,6 +65,14 @@ export function GraphPage() {
     const width = container.clientWidth;
     const height = container.clientHeight;
 
+    // Node = solid black, edge = light gray. Explicit colors so the graph
+    // reads cleanly regardless of theme.
+    const COLOR_NODE = '#000000';
+    const COLOR_NODE_STROKE = '#ffffff';
+    const COLOR_LABEL = '#0a0a0a';
+    const EDGE_COLOR = '#cbcbcb';
+    const EDGE_COLOR_HOVER = '#000000';
+
     svg.attr('width', width).attr('height', height);
 
     // Prepare data copies for D3 (D3 mutates these in-place)
@@ -115,14 +123,13 @@ export function GraphPage() {
 
     svg.call(zoom);
 
-    // Edge lines
     const link = g
       .append('g')
       .attr('class', 'links')
       .selectAll('line')
       .data(validLinks)
       .join('line')
-      .attr('stroke', 'hsl(var(--muted-foreground) / 0.3)')
+      .attr('stroke', EDGE_COLOR)
       .attr('stroke-width', 1);
 
     // Node groups
@@ -156,8 +163,8 @@ export function GraphPage() {
     node
       .append('circle')
       .attr('r', (d) => Math.max(6, Math.min(16, 6 + d.linkCount * 2)))
-      .attr('fill', 'hsl(var(--primary))')
-      .attr('stroke', 'hsl(var(--background))')
+      .attr('fill', COLOR_NODE)
+      .attr('stroke', COLOR_NODE_STROKE)
       .attr('stroke-width', 2);
 
     // Node labels
@@ -167,7 +174,7 @@ export function GraphPage() {
       .attr('x', (d) => Math.max(6, Math.min(16, 6 + d.linkCount * 2)) + 6)
       .attr('y', 4)
       .attr('font-size', '12px')
-      .attr('fill', 'hsl(var(--foreground))')
+      .attr('fill', COLOR_LABEL)
       .attr('pointer-events', 'none');
 
     // Hover: highlight connected edges
@@ -175,9 +182,7 @@ export function GraphPage() {
       link.attr('stroke', (l) => {
         const srcId = typeof l.source === 'string' ? l.source : (l.source as SimNode).id;
         const tgtId = typeof l.target === 'string' ? l.target : (l.target as SimNode).id;
-        return srcId === d.id || tgtId === d.id
-          ? 'hsl(var(--primary))'
-          : 'hsl(var(--muted-foreground) / 0.3)';
+        return srcId === d.id || tgtId === d.id ? EDGE_COLOR_HOVER : EDGE_COLOR;
       });
       link.attr('stroke-width', (l) => {
         const srcId = typeof l.source === 'string' ? l.source : (l.source as SimNode).id;
@@ -187,9 +192,7 @@ export function GraphPage() {
     });
 
     node.on('mouseleave', () => {
-      link
-        .attr('stroke', 'hsl(var(--muted-foreground) / 0.3)')
-        .attr('stroke-width', 1);
+      link.attr('stroke', EDGE_COLOR).attr('stroke-width', 1);
     });
 
     // Click: navigate to note

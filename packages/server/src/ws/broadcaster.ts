@@ -10,7 +10,13 @@ export type BroadcastEvent =
   | 'search:reindexed'
   | 'project:created'
   | 'project:updated'
-  | 'project:deleted';
+  | 'project:deleted'
+  | 'bookmark-group:created'
+  | 'bookmark-group:updated'
+  | 'bookmark-group:deleted'
+  | 'bookmark:created'
+  | 'bookmark:updated'
+  | 'bookmark:deleted';
 
 export class Broadcaster {
   private wss: WebSocketServer | null = null;

@@ -5,6 +5,8 @@ import type {
   Tag,
   Folder,
   Project,
+  Bookmark,
+  BookmarkGroup,
   SearchResult,
   Link,
   GraphData,
@@ -338,6 +340,54 @@ const links = {
   },
 };
 
+const bookmarks = {
+  listGroups(): Promise<BookmarkGroup[]> {
+    return fetchJson<BookmarkGroup[]>('/api/bookmarks/groups');
+  },
+  createGroup(name: string): Promise<BookmarkGroup> {
+    return fetchJson<BookmarkGroup>('/api/bookmarks/groups', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  },
+  renameGroup(id: string, name: string): Promise<{ id: string; name: string }> {
+    return fetchJson<{ id: string; name: string }>(`/api/bookmarks/groups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  },
+  deleteGroup(id: string): Promise<{ deleted: true; id: string }> {
+    return fetchJson<{ deleted: true; id: string }>(`/api/bookmarks/groups/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  list(groupId?: string): Promise<Bookmark[]> {
+    const qs = groupId ? `?group=${encodeURIComponent(groupId)}` : '';
+    return fetchJson<Bookmark[]>(`/api/bookmarks${qs}`);
+  },
+  create(data: { groupId: string; title: string; url: string; description?: string }): Promise<Bookmark> {
+    return fetchJson<Bookmark>('/api/bookmarks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update(
+    id: string,
+    data: { title?: string; url?: string; description?: string | null; groupId?: string },
+  ): Promise<{ id: string }> {
+    return fetchJson<{ id: string }>(`/api/bookmarks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  delete(id: string): Promise<{ deleted: true; id: string }> {
+    return fetchJson<{ deleted: true; id: string }>(`/api/bookmarks/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 const graph = {
   /** Get the full link graph for visualization. */
   get(): Promise<GraphData> {
@@ -436,6 +486,7 @@ export const api = {
   projects,
   embed,
   meetings,
+  bookmarks,
   links,
   graph,
   ai,

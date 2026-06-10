@@ -13,6 +13,10 @@ import {
   AlertTriangle,
   BookMarked,
   Lightbulb,
+  Bookmark,
+  Wand2,
+  Shuffle,
+  Bot,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { MeetingRecorder } from '@/components/meeting/MeetingRecorder';
@@ -22,12 +26,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import {
   Sidebar,
   SidebarContent,
@@ -42,10 +52,6 @@ import {
 import { NavSection } from './NavSection';
 import { NavQuickLinks } from './NavQuickLinks';
 import type { Note, NoteType } from '@/types';
-
-const NOTE_TYPES: NoteType[] = [
-  'note', 'meeting', 'diagram', 'plan', 'decision', 'gotcha', 'reference', 'explanation',
-];
 
 // Type sections shown in the sidebar. Primary types are always visible (even
 // when empty); secondary types only appear when they have notes.
@@ -62,6 +68,18 @@ const TYPE_META: Record<NoteType, { label: string; icon: LucideIcon }> = {
 const PRIMARY_TYPES: NoteType[] = ['note', 'plan', 'diagram', 'meeting'];
 const SECONDARY_TYPES: NoteType[] = ['decision', 'gotcha', 'reference', 'explanation'];
 
+// Singular labels for the Create dropdown (e.g. "New plan", not "New plans").
+const CREATE_LABEL: Record<NoteType, string> = {
+  note: 'Note',
+  plan: 'Plan',
+  diagram: 'Diagram',
+  meeting: 'Meeting',
+  decision: 'Decision',
+  gotcha: 'Gotcha',
+  reference: 'Reference',
+  explanation: 'Explanation',
+};
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate();
 
@@ -69,15 +87,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const fetchNotes = useNoteStore((s) => s.fetchNotes);
   const createNote = useNoteStore((s) => s.createNote);
 
-  const projects = useProjectStore((s) => s.projects);
   const fetchProjects = useProjectStore((s) => s.fetchProjects);
   const createProject = useProjectStore((s) => s.createProject);
   const initProjectWs = useProjectStore((s) => s.initWebSocket);
-
-  const [newNoteTitle, setNewNoteTitle] = useState('');
-  const [newNoteProject, setNewNoteProject] = useState('');
-  const [newNoteType, setNewNoteType] = useState<NoteType>('note');
-  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
 
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDesc, setNewProjectDesc] = useState('');
@@ -91,19 +103,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     initProjectWs();
   }, [fetchNotes, fetchProjects, initProjectWs]);
 
-  const handleCreateNote = useCallback(async () => {
-    if (!newNoteTitle.trim()) return;
-    const note = await createNote({
-      title: newNoteTitle.trim(),
-      projectId: newNoteProject || undefined,
-      type: newNoteType,
-    });
-    setNewNoteTitle('');
-    setNewNoteProject('');
-    setNewNoteType('note');
-    setNoteDialogOpen(false);
-    if (note) navigate(`/notes/${note.id}`);
-  }, [newNoteTitle, newNoteProject, newNoteType, createNote, navigate]);
+  // Instant-create: no title prompt, just "Untitled" — user renames inline.
+  const handleQuickCreate = useCallback(
+    async (type: NoteType) => {
+      const note = await createNote({ title: 'Untitled', type });
+      if (note) navigate(`/notes/${note.id}`);
+    },
+    [createNote, navigate],
+  );
 
   const handleCreateProject = useCallback(async () => {
     if (!newProjectName.trim()) return;
@@ -148,106 +155,70 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          {/* New Note */}
+          {/* One Create button — opens a menu of options with icons. */}
           <SidebarMenuItem>
-            <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-              <DialogTrigger asChild>
-                <SidebarMenuButton tooltip="New Note">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton tooltip="Create">
                   <Plus />
-                  <span>New Note</span>
+                  <span>Create</span>
                 </SidebarMenuButton>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Note</DialogTitle>
-                </DialogHeader>
-                <Input
-                  placeholder="Note title..."
-                  value={newNoteTitle}
-                  onChange={(e) => setNewNoteTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateNote();
-                  }}
-                  autoFocus
-                />
-                <div className="flex gap-2">
-                  <select
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={newNoteProject}
-                    onChange={(e) => setNewNoteProject(e.target.value)}
-                  >
-                    <option value="">No project</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <select
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={newNoteType}
-                    onChange={(e) => setNewNoteType(e.target.value as NoteType)}
-                  >
-                    {NOTE_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateNote}>Create</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-48">
+                {PRIMARY_TYPES.map((type) => {
+                  const Icon = TYPE_META[type].icon;
+                  if (type === 'meeting') {
+                    return (
+                      <DropdownMenuItem key={type} onClick={() => setRecorderOpen(true)}>
+                        <Mic className="text-muted-foreground" />
+                        <span>Meeting</span>
+                      </DropdownMenuItem>
+                    );
+                  }
+                  return (
+                    <DropdownMenuItem key={type} onClick={() => handleQuickCreate(type)}>
+                      <Icon className="text-muted-foreground" />
+                      <span>{CREATE_LABEL[type]}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setProjectDialogOpen(true)}>
+                  <FolderKanban className="text-muted-foreground" />
+                  <span>Project</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
 
-          {/* New Meeting (AI transcription) */}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Start transcribing"
-              onClick={() => setRecorderOpen(true)}
-            >
-              <Mic />
-              <span>Start transcribing</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          {/* New Project */}
-          <SidebarMenuItem>
-            <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
-              <DialogTrigger asChild>
-                <SidebarMenuButton tooltip="New Project">
-                  <FolderKanban />
-                  <span>New Project</span>
-                </SidebarMenuButton>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Project</DialogTitle>
-                </DialogHeader>
-                <Input
-                  placeholder="Project name..."
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateProject();
-                  }}
-                  autoFocus
-                />
-                <Input
-                  placeholder="Description (optional)..."
-                  value={newProjectDesc}
-                  onChange={(e) => setNewProjectDesc(e.target.value)}
-                />
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setProjectDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateProject}>Create</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </SidebarMenuItem>
+          {/* Project dialog — still needs a name up-front. */}
+          <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+              </DialogHeader>
+              <Input
+                placeholder="Project name..."
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateProject();
+                }}
+                autoFocus
+              />
+              <Input
+                placeholder="Description (optional)..."
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setProjectDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateProject}>Create</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </SidebarMenu>
       </SidebarHeader>
 
@@ -273,8 +244,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 />
               ),
             )}
+
+            {/* Tools — same menu, just flat entries below the type sections */}
+            {[
+              { label: 'Bookmarks', icon: Bookmark, path: '/bookmarks' },
+              { label: 'Composer', icon: Wand2, path: '/composer' },
+              { label: 'Transformer', icon: Shuffle, path: '/transformer' },
+              { label: 'Agents', icon: Bot, path: '/agents' },
+            ].map((tool) => (
+              <SidebarMenuItem key={tool.path}>
+                <SidebarMenuButton
+                  tooltip={tool.label}
+                  onClick={() => navigate(tool.path)}
+                >
+                  <tool.icon />
+                  <span>{tool.label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroup>
+
         <NavQuickLinks />
       </SidebarContent>
 

@@ -89,6 +89,22 @@ export interface DailyNote {
   noteId: string;
 }
 
+export interface BookmarkGroup {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface Bookmark {
+  id: string;
+  groupId: string;
+  title: string;
+  url: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SearchResult {
   id: string;
   title: string;

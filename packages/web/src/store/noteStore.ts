@@ -52,6 +52,10 @@ interface NoteActions {
   /** Set the dirty flag (unsaved changes). */
   setDirty(dirty: boolean): void;
 
+  /** Update currentNote locally without hitting the API — used for inline
+   *  edits where the actual save is handled by a debounced effect. */
+  patchCurrentNote(partial: Partial<Note>): void;
+
   /** Append blocks to a note and refresh currentNote. */
   appendBlocks(noteId: string, blocks: Block[]): Promise<void>;
 
@@ -135,6 +139,17 @@ export const useNoteStore = create<NoteState & NoteActions>()((set, get) => ({
 
   setDirty(dirty) {
     set({ dirty });
+  },
+
+  patchCurrentNote(partial) {
+    set((s) => {
+      if (!s.currentNote) return s;
+      const updated = { ...s.currentNote, ...partial };
+      return {
+        currentNote: updated,
+        notes: s.notes.map((n) => (n.id === updated.id ? updated : n)),
+      };
+    });
   },
 
   async appendBlocks(noteId, blocks) {

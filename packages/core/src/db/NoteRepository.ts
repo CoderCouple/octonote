@@ -9,6 +9,8 @@ import {
   Tag,
   Link,
   DailyNote,
+  Bookmark,
+  BookmarkGroup,
   StorageFormat,
 } from '../models/types';
 
@@ -294,6 +296,96 @@ export class NoteRepository {
     if (existing) return existing;
     const name = repo.split('/').pop() || repo;
     return this.createProject(name, { slug: slugify(repo), repo });
+  }
+
+  // ── Bookmarks ──────────────────────────────────────────
+
+  async createBookmarkGroup(name: string): Promise<BookmarkGroup> {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    await this.pool.query(
+      'INSERT INTO bookmark_groups (id, name, created_at) VALUES ($1, $2, $3)',
+      [id, name, now]
+    );
+    return { id, name, createdAt: now };
+  }
+
+  async listBookmarkGroups(): Promise<BookmarkGroup[]> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM bookmark_groups ORDER BY name'
+    );
+    return rows.map((r: any) => ({ id: r.id, name: r.name, createdAt: r.created_at }));
+  }
+
+  async updateBookmarkGroup(id: string, name: string): Promise<void> {
+    await this.pool.query('UPDATE bookmark_groups SET name = $1 WHERE id = $2', [name, id]);
+  }
+
+  async deleteBookmarkGroup(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM bookmark_groups WHERE id = $1', [id]);
+  }
+
+  async createBookmark(
+    groupId: string,
+    title: string,
+    url: string,
+    description?: string | null
+  ): Promise<Bookmark> {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    await this.pool.query(
+      'INSERT INTO bookmarks (id, group_id, title, url, description, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, groupId, title, url, description ?? null, now, now]
+    );
+    return {
+      id,
+      groupId,
+      title,
+      url,
+      description: description ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  async listBookmarks(groupId?: string): Promise<Bookmark[]> {
+    const sql = groupId
+      ? 'SELECT * FROM bookmarks WHERE group_id = $1 ORDER BY created_at DESC'
+      : 'SELECT * FROM bookmarks ORDER BY created_at DESC';
+    const { rows } = await this.pool.query(sql, groupId ? [groupId] : []);
+    return rows.map((r: any) => this.mapBookmark(r));
+  }
+
+  async updateBookmark(
+    id: string,
+    updates: Partial<Pick<Bookmark, 'title' | 'url' | 'description' | 'groupId'>>
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const fields: string[] = ['updated_at = $1'];
+    const values: unknown[] = [now];
+    let p = 2;
+    if (updates.title !== undefined) { fields.push(`title = $${p}`); values.push(updates.title); p++; }
+    if (updates.url !== undefined) { fields.push(`url = $${p}`); values.push(updates.url); p++; }
+    if (updates.description !== undefined) { fields.push(`description = $${p}`); values.push(updates.description); p++; }
+    if (updates.groupId !== undefined) { fields.push(`group_id = $${p}`); values.push(updates.groupId); p++; }
+    values.push(id);
+    await this.pool.query(`UPDATE bookmarks SET ${fields.join(', ')} WHERE id = $${p}`, values);
+  }
+
+  async deleteBookmark(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM bookmarks WHERE id = $1', [id]);
+  }
+
+  private mapBookmark(row: any): Bookmark {
+    return {
+      id: row.id,
+      groupId: row.group_id,
+      title: row.title,
+      url: row.url,
+      description: row.description ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   // ── Tags ───────────────────────────────────────────────

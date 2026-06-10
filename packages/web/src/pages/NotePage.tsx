@@ -12,7 +12,6 @@ import { AiPanel } from '@/components/editor/AiPanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Tooltip,
@@ -20,17 +19,9 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
-import {
-  Sparkles,
-  ArrowLeft,
-  Link as LinkIcon,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-} from 'lucide-react';
+import { Sparkles, ArrowLeft, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
-import type { Link } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -44,16 +35,11 @@ export function NotePage() {
   const loading = useNoteStore((s) => s.loading);
   const dirty = useNoteStore((s) => s.dirty);
   const fetchNote = useNoteStore((s) => s.fetchNote);
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const patchCurrentNote = useNoteStore((s) => s.patchCurrentNote);
   const setDirty = useNoteStore((s) => s.setDirty);
   const initWebSocket = useNoteStore((s) => s.initWebSocket);
 
   const [aiOpen, setAiOpen] = useState(false);
-  const [backlinksOpen, setBacklinksOpen] = useState(false);
-  const [backlinks, setBacklinks] = useState<Link[]>([]);
-  const [backlinkNotes, setBacklinkNotes] = useState<
-    Map<string, { id: string; title: string }>
-  >(new Map());
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsInitRef = useRef(false);
@@ -73,29 +59,9 @@ export function NotePage() {
     }
   }, [initWebSocket]);
 
-  // Fetch backlinks
-  useEffect(() => {
-    if (!id) return;
-    api.links
-      .get(id)
-      .then(({ backlinks: bl }) => {
-        setBacklinks(bl);
-        // Fetch note titles for each backlink source
-        const noteMap = new Map<string, { id: string; title: string }>();
-        const promises = bl.map(async (link) => {
-          try {
-            const note = await api.notes.get(link.sourceNoteId);
-            noteMap.set(link.sourceNoteId, { id: note.id, title: note.title });
-          } catch {
-            // Ignore missing notes
-          }
-        });
-        Promise.all(promises).then(() => setBacklinkNotes(new Map(noteMap)));
-      })
-      .catch(() => {});
-  }, [id]);
-
-  // Auto-save with debounce
+  // Auto-save title with debounce. We hit the API directly instead of the
+  // store action — the store would overwrite currentNote with the server
+  // response and clobber any keystrokes that landed during the request.
   useEffect(() => {
     if (!dirty || !currentNote) return;
 
@@ -103,26 +69,30 @@ export function NotePage() {
       clearTimeout(saveTimerRef.current);
     }
 
+    const id = currentNote.id;
+    const title = currentNote.title;
     saveTimerRef.current = setTimeout(() => {
-      updateNote(currentNote.id, { title: currentNote.title });
-      setDirty(false);
-    }, 1000);
+      api.notes
+        .update(id, { title })
+        .then(() => setDirty(false))
+        .catch((err) => console.error('Failed to save title:', err));
+    }, 600);
 
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [dirty, currentNote, updateNote, setDirty]);
+  }, [dirty, currentNote, setDirty]);
 
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!currentNote) return;
-      // Optimistically update in the store
-      updateNote(currentNote.id, { title: e.target.value });
+      // Optimistic local update only — debounced effect persists to the API.
+      patchCurrentNote({ title: e.target.value });
       setDirty(true);
     },
-    [currentNote, updateNote, setDirty],
+    [currentNote, patchCurrentNote, setDirty],
   );
 
   // -----------------------------------------------------------------------
@@ -194,15 +164,17 @@ export function NotePage() {
       </div>
 
       {/* Editor area */}
-      <ScrollArea className="flex-1">
-        {currentNote.type === 'diagram' ? (
-          // Drawings fill the full pane — no max-width constraint.
-          <div className="px-4 py-6">
-            <Suspense fallback={<Skeleton className="h-[60vh] w-full" />}>
-              <DrawingView key={currentNote.id} note={currentNote} />
-            </Suspense>
-          </div>
-        ) : (
+      {currentNote.type === 'diagram' ? (
+        // Drawings fill the remaining pane — no scroll wrapper, no backlinks.
+        // tldraw handles its own pan/zoom and should not be nested in a
+        // scroll container.
+        <div className="flex-1 min-h-0">
+          <Suspense fallback={<Skeleton className="h-full w-full" />}>
+            <DrawingView key={currentNote.id} note={currentNote} />
+          </Suspense>
+        </div>
+      ) : (
+        <ScrollArea className="flex-1">
           <div className="mx-auto max-w-3xl px-4 py-6">
             {currentNote.type === 'meeting' ? (
               <MeetingView note={currentNote} />
@@ -214,51 +186,8 @@ export function NotePage() {
               />
             )}
           </div>
-        )}
-
-        {/* Backlink panel */}
-        <div className="mx-auto max-w-3xl px-4 pb-6">
-          <Separator className="mb-4" />
-          <button
-            onClick={() => setBacklinksOpen(!backlinksOpen)}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {backlinksOpen ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-            <LinkIcon className="h-4 w-4" />
-            Backlinks ({backlinks.length})
-          </button>
-
-          {backlinksOpen && (
-            <div className="mt-3 space-y-2 pl-6">
-              {backlinks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No other notes link to this one.
-                </p>
-              ) : (
-                backlinks.map((link) => {
-                  const noteInfo = backlinkNotes.get(link.sourceNoteId);
-                  return (
-                    <button
-                      key={link.id}
-                      onClick={() => navigate(`/notes/${link.sourceNoteId}`)}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors w-full text-left"
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="font-medium">
-                        {noteInfo?.title ?? link.sourceNoteId}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      )}
 
       {/* Floating AI button */}
       <TooltipProvider>

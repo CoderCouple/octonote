@@ -87,6 +87,22 @@ export interface DailyNote {
   noteId: string;
 }
 
+export interface BookmarkGroup {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface Bookmark {
+  id: string;
+  groupId: string;
+  title: string;
+  url: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type StorageFormat = 'json' | 'markdown';
 
 export interface VaultConfig {

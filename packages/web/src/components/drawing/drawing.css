@@ -1,8 +1,28 @@
+/* Full-bleed drawing canvas — no frame, blends with the app background. */
 .drawing-view {
   position: relative;
   width: 100%;
-  height: calc(100vh - 110px);
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid hsl(var(--border));
+  height: 100%;
+}
+
+/* Override tldraw's --tl-color-* tokens to use the app's shadcn design
+ * tokens. This re-skins every panel (top-left main menu, undo/redo,
+ * style panel, minimap, popovers) to match the rest of the UI. */
+.drawing-view .tl-container {
+  --tl-color-background: var(--background);
+  --tl-color-low: var(--muted);
+  --tl-color-low-border: var(--border);
+  --tl-color-panel: var(--card);
+  --tl-color-panel-contrast: var(--popover);
+  --tl-color-panel-overlay: color-mix(in oklch, var(--popover) 92%, transparent);
+  --tl-color-divider: var(--border);
+  --tl-color-text: var(--foreground);
+  --tl-color-text-0: var(--foreground);
+  --tl-color-text-1: var(--foreground);
+  --tl-color-text-3: var(--muted-foreground);
+  --tl-color-hint: var(--muted);
+  --tl-color-selected: var(--primary);
+  --tl-color-selected-contrast: var(--primary-foreground);
+  --tl-color-focus: var(--ring);
+  --tl-color-overlay: color-mix(in oklch, var(--foreground) 30%, transparent);
 }
