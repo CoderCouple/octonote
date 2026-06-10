@@ -6,7 +6,15 @@ import {
   Settings,
   FolderKanban,
   Mic,
+  Users,
+  PenLine,
+  ClipboardList,
+  GitBranch,
+  AlertTriangle,
+  BookMarked,
+  Lightbulb,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { MeetingRecorder } from '@/components/meeting/MeetingRecorder';
 import { useNoteStore } from '@/store/noteStore';
 import { useProjectStore } from '@/store/projectStore';
@@ -24,19 +32,35 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { ProjectNav } from './ProjectNav';
+import { NavSection } from './NavSection';
 import { NavQuickLinks } from './NavQuickLinks';
 import type { Note, NoteType } from '@/types';
 
 const NOTE_TYPES: NoteType[] = [
   'note', 'meeting', 'diagram', 'plan', 'decision', 'gotcha', 'reference', 'explanation',
 ];
+
+// Type sections shown in the sidebar. Primary types are always visible (even
+// when empty); secondary types only appear when they have notes.
+const TYPE_META: Record<NoteType, { label: string; icon: LucideIcon }> = {
+  note: { label: 'Notes', icon: FileText },
+  plan: { label: 'Plans', icon: ClipboardList },
+  diagram: { label: 'Diagrams', icon: PenLine },
+  meeting: { label: 'Meetings', icon: Users },
+  decision: { label: 'Decisions', icon: GitBranch },
+  gotcha: { label: 'Gotchas', icon: AlertTriangle },
+  reference: { label: 'References', icon: BookMarked },
+  explanation: { label: 'Explanations', icon: Lightbulb },
+};
+const PRIMARY_TYPES: NoteType[] = ['note', 'plan', 'diagram', 'meeting'];
+const SECONDARY_TYPES: NoteType[] = ['decision', 'gotcha', 'reference', 'explanation'];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate();
@@ -92,20 +116,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setProjectDialogOpen(false);
   }, [newProjectName, newProjectDesc, createProject]);
 
-  // Group notes by project; notes with no project go to "Unassigned".
-  const { byProject, unassigned } = useMemo(() => {
-    const map = new Map<string, Note[]>();
-    const loose: Note[] = [];
+  // Group notes by type. Untyped legacy notes fall back to 'note'.
+  const byType = useMemo(() => {
+    const map = new Map<NoteType, Note[]>();
     for (const note of notes) {
-      if (note.projectId) {
-        const list = map.get(note.projectId) ?? [];
-        list.push(note);
-        map.set(note.projectId, list);
-      } else {
-        loose.push(note);
-      }
+      const t = (note.type ?? 'note') as NoteType;
+      const list = map.get(t) ?? [];
+      list.push(note);
+      map.set(t, list);
     }
-    return { byProject: map, unassigned: loose };
+    return map;
   }, [notes]);
 
   return (
@@ -232,17 +252,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        {projects.map((p) => (
-          <ProjectNav
-            key={p.id}
-            label={p.name}
-            notes={byProject.get(p.id) ?? []}
-            defaultOpen
-          />
-        ))}
-        {unassigned.length > 0 && (
-          <ProjectNav label="Unassigned" notes={unassigned} defaultOpen />
-        )}
+        <SidebarGroup>
+          <SidebarMenu>
+            {PRIMARY_TYPES.map((type) => (
+              <NavSection
+                key={type}
+                label={TYPE_META[type].label}
+                icon={TYPE_META[type].icon}
+                notes={byType.get(type) ?? []}
+                defaultOpen
+              />
+            ))}
+            {SECONDARY_TYPES.filter((t) => (byType.get(t)?.length ?? 0) > 0).map(
+              (type) => (
+                <NavSection
+                  key={type}
+                  label={TYPE_META[type].label}
+                  icon={TYPE_META[type].icon}
+                  notes={byType.get(type)!}
+                />
+              ),
+            )}
+          </SidebarMenu>
+        </SidebarGroup>
         <NavQuickLinks />
       </SidebarContent>
 
